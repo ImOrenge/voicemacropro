@@ -2,13 +2,15 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from macro_service import macro_service
-from voice_recognition_service_basic import get_voice_recognition_service_basic
-from whisper_service import whisper_service
 from voice_recognition_service import get_voice_recognition_service
+from whisper_service import whisper_service
 from macro_execution_service import macro_execution_service
 import json
 import numpy as np
 import base64
+import asyncio
+import threading
+from database import DatabaseManager
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__)
@@ -285,6 +287,7 @@ def increment_usage(macro_id):
 def execute_macro(macro_id):
     """
     매크로를 실제로 실행하는 API 엔드포인트
+    새로운 비동기 매크로 실행 서비스를 사용합니다.
     
     Args:
         macro_id (int): 실행할 매크로 ID
@@ -293,24 +296,41 @@ def execute_macro(macro_id):
         JSON: 실행 결과
     """
     try:
-        result = macro_execution_service.execute_macro(macro_id)
-        
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'data': {
-                    'execution_time': result['execution_time'],
-                    'message': result['message']
-                },
-                'message': '매크로 실행 성공'
-            }), 200
-        else:
+        # 매크로 정보 조회
+        macro = macro_service.get_macro_by_id(macro_id)
+        if not macro:
             return jsonify({
                 'success': False,
-                'error': result.get('error', '매크로 실행 실패'),
-                'message': '매크로 실행 실패'
-            }), 400
-            
+                'message': f'매크로를 찾을 수 없습니다: ID {macro_id}'
+            }), 404
+        
+        # 비동기 함수를 동기 함수에서 실행하기 위한 래퍼
+        def run_async_macro():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(macro_execution_service.execute_macro(macro))
+                return result
+            finally:
+                loop.close()
+        
+        # 백그라운드 스레드에서 매크로 실행
+        thread = threading.Thread(target=run_async_macro)
+        thread.daemon = True
+        thread.start()
+        
+        # 즉시 응답 반환 (비동기 실행)
+        return jsonify({
+            'success': True,
+            'data': {
+                'macro_id': macro_id,
+                'macro_name': macro['name'],
+                'action_type': macro['action_type'],
+                'status': 'started'
+            },
+            'message': '매크로 실행이 시작되었습니다'
+        }), 200
+        
     except Exception as e:
         return jsonify({
             'success': False,
@@ -318,20 +338,61 @@ def execute_macro(macro_id):
             'message': '매크로 실행 중 오류 발생'
         }), 500
 
+@app.route('/api/macros/<int:macro_id>/stop', methods=['POST'])
+def stop_macro(macro_id):
+    """
+    실행 중인 매크로를 중지하는 API 엔드포인트
+    
+    Args:
+        macro_id (int): 중지할 매크로 ID
+        
+    Returns:
+        JSON: 중지 결과
+    """
+    try:
+        success = macro_execution_service.stop_macro(macro_id)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'매크로 {macro_id}가 중지되었습니다'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'매크로 {macro_id}가 실행 중이지 않습니다'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '매크로 중지 실패'
+        }), 500
+
 @app.route('/api/macros/execution/stop-all', methods=['POST'])
 def stop_all_macros():
     """
-    모든 토글 매크로를 중지하는 API 엔드포인트 (비상 정지)
+    모든 실행 중인 매크로를 중지하는 API 엔드포인트 (비상 정지)
     
     Returns:
         JSON: 중지 결과
     """
     try:
-        macro_execution_service.stop_all_toggle_macros()
+        running_macros = macro_execution_service.get_running_macros()
+        stopped_count = 0
+        
+        for macro_id in running_macros:
+            if macro_execution_service.stop_macro(macro_id):
+                stopped_count += 1
         
         return jsonify({
             'success': True,
-            'message': '모든 토글 매크로가 중지되었습니다'
+            'data': {
+                'stopped_count': stopped_count,
+                'total_running': len(running_macros)
+            },
+            'message': f'총 {stopped_count}개의 매크로가 중지되었습니다'
         }), 200
         
     except Exception as e:
@@ -350,7 +411,33 @@ def get_execution_status():
         JSON: 실행 상태 정보
     """
     try:
-        status = macro_execution_service.get_execution_status()
+        running_macros = macro_execution_service.get_running_macros()
+        
+        # 실행 중인 매크로 상세 정보 조회
+        running_details = []
+        for macro_id in running_macros:
+            macro = macro_service.get_macro_by_id(macro_id)
+            if macro:
+                running_details.append({
+                    'id': macro_id,
+                    'name': macro['name'],
+                    'action_type': macro['action_type']
+                })
+        
+        # 토글 상태 정보 수집
+        toggle_states = {}
+        for macro in macro_service.get_all_macros():
+            if macro['action_type'] == 'toggle':
+                toggle_states[macro['id']] = macro_execution_service.get_toggle_state(macro['id'])
+        
+        status = {
+            'service_active': True,
+            'running_macros_count': len(running_macros),
+            'running_macros': running_details,
+            'toggle_states': toggle_states,
+            'failsafe_enabled': True,  # PyAutoGUI.FAILSAFE
+            'timestamp': macro_service.get_current_timestamp()
+        }
         
         return jsonify({
             'success': True,
@@ -365,6 +452,108 @@ def get_execution_status():
             'message': '매크로 실행 상태 조회 실패'
         }), 500
 
+@app.route('/api/macros/<int:macro_id>/toggle-state', methods=['GET'])
+def get_toggle_state(macro_id):
+    """
+    토글 매크로의 현재 상태를 조회하는 API 엔드포인트
+    
+    Args:
+        macro_id (int): 조회할 매크로 ID
+        
+    Returns:
+        JSON: 토글 상태
+    """
+    try:
+        # 매크로가 토글 타입인지 확인
+        macro = macro_service.get_macro_by_id(macro_id)
+        if not macro:
+            return jsonify({
+                'success': False,
+                'message': '매크로를 찾을 수 없습니다'
+            }), 404
+        
+        if macro['action_type'] != 'toggle':
+            return jsonify({
+                'success': False,
+                'message': '토글 매크로가 아닙니다'
+            }), 400
+        
+        state = macro_execution_service.get_toggle_state(macro_id)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'macro_id': macro_id,
+                'macro_name': macro['name'],
+                'is_on': state
+            },
+            'message': '토글 상태 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '토글 상태 조회 실패'
+        }), 500
+
+@app.route('/api/macros/<int:macro_id>/toggle-state', methods=['POST'])
+def set_toggle_state(macro_id):
+    """
+    토글 매크로의 상태를 직접 설정하는 API 엔드포인트
+    
+    Args:
+        macro_id (int): 설정할 매크로 ID
+        
+    요청 본문:
+        state (bool): 설정할 상태 (True=ON, False=OFF)
+        
+    Returns:
+        JSON: 설정 결과
+    """
+    try:
+        data = request.get_json()
+        state = data.get('state')
+        
+        if state is None:
+            return jsonify({
+                'success': False,
+                'message': 'state 값이 필요합니다 (true 또는 false)'
+            }), 400
+        
+        # 매크로가 토글 타입인지 확인
+        macro = macro_service.get_macro_by_id(macro_id)
+        if not macro:
+            return jsonify({
+                'success': False,
+                'message': '매크로를 찾을 수 없습니다'
+            }), 404
+        
+        if macro['action_type'] != 'toggle':
+            return jsonify({
+                'success': False,
+                'message': '토글 매크로가 아닙니다'
+            }), 400
+        
+        macro_execution_service.set_toggle_state(macro_id, bool(state))
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'macro_id': macro_id,
+                'macro_name': macro['name'],
+                'is_on': bool(state)
+            },
+            'message': '토글 상태 설정 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '토글 상태 설정 실패'
+        }), 500
+
 # ========== 음성 인식 관련 API 엔드포인트==========
 
 @app.route('/api/voice/devices', methods=['GET'])
@@ -376,7 +565,7 @@ def get_voice_devices():
         JSON: 마이크 장치 목록
     """
     try:
-        voice_service = get_voice_recognition_service_basic()
+        voice_service = get_voice_recognition_service()
         devices = voice_service.get_available_devices()
         
         return jsonify({
@@ -413,7 +602,7 @@ def set_voice_device():
                 'message': 'device_id가 필요합니다'
             }), 400
         
-        voice_service = get_voice_recognition_service_basic()
+        voice_service = get_voice_recognition_service()
         success = voice_service.set_device(device_id)
         
         if success:
@@ -443,7 +632,7 @@ def start_voice_recording():
         JSON: 녹음 시작 결과
     """
     try:
-        voice_service = get_voice_recognition_service_basic()
+        voice_service = get_voice_recognition_service()
         success = voice_service.start_recording()
         
         if success:
@@ -473,7 +662,7 @@ def stop_voice_recording():
         JSON: 녹음 중지 결과
     """
     try:
-        voice_service = get_voice_recognition_service_basic()
+        voice_service = get_voice_recognition_service()
         success = voice_service.stop_recording()
         
         if success:
@@ -503,7 +692,7 @@ def get_voice_status():
         JSON: 녹음 상태 정보
     """
     try:
-        voice_service = get_voice_recognition_service_basic()
+        voice_service = get_voice_recognition_service()
         status = voice_service.get_recording_status()
         
         return jsonify({
@@ -528,7 +717,7 @@ def test_microphone():
         JSON: 테스트 결과
     """
     try:
-        voice_service = get_voice_recognition_service_basic()
+        voice_service = get_voice_recognition_service()
         test_result = voice_service.test_microphone()
         
         return jsonify({

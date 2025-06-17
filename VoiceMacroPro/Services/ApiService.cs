@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using VoiceMacroPro.Models;
+using System.Text.Json.Serialization;
 
 namespace VoiceMacroPro.Services
 {
@@ -264,6 +265,141 @@ namespace VoiceMacroPro.Services
             }
         }
 
+        /// <summary>
+        /// 실행 중인 매크로를 중지하는 함수
+        /// </summary>
+        /// <param name="macroId">중지할 매크로 ID</param>
+        /// <returns>중지 성공 여부</returns>
+        public async Task<bool> StopMacroAsync(int macroId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/macros/{macroId}/stop";
+                var httpContent = new StringContent("", Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, httpContent);
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"매크로 중지 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 모든 실행 중인 매크로를 중지하는 함수 (비상 정지)
+        /// </summary>
+        /// <returns>중지된 매크로 개수</returns>
+        public async Task<int> StopAllMacrosAsync()
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/macros/execution/stop-all";
+                var httpContent = new StringContent("", Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, httpContent);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
+                    return apiResponse?.Data?.stopped_count ?? 0;
+                }
+                else
+                {
+                    throw new Exception($"매크로 중지 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"매크로 중지 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 실행 상태를 조회하는 함수
+        /// </summary>
+        /// <returns>실행 상태 정보</returns>
+        public async Task<MacroExecutionStatus?> GetExecutionStatusAsync()
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/macros/execution/status";
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<MacroExecutionStatus>>(content);
+                    return apiResponse?.Data;
+                }
+                else
+                {
+                    throw new Exception($"실행 상태 조회 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"실행 상태 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 토글 매크로의 현재 상태를 조회하는 함수
+        /// </summary>
+        /// <param name="macroId">조회할 매크로 ID</param>
+        /// <returns>토글 상태 정보</returns>
+        public async Task<ToggleState?> GetToggleStateAsync(int macroId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/macros/{macroId}/toggle-state";
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<ToggleState>>(content);
+                    return apiResponse?.Data;
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound ||
+                         response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+                {
+                    return null; // 매크로를 찾을 수 없거나 토글 타입이 아님
+                }
+                else
+                {
+                    throw new Exception($"토글 상태 조회 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"토글 상태 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 토글 매크로의 상태를 직접 설정하는 함수
+        /// </summary>
+        /// <param name="macroId">설정할 매크로 ID</param>
+        /// <param name="state">설정할 상태 (true=ON, false=OFF)</param>
+        /// <returns>설정 성공 여부</returns>
+        public async Task<bool> SetToggleStateAsync(int macroId, bool state)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/macros/{macroId}/toggle-state";
+                var jsonContent = JsonConvert.SerializeObject(new { state = state });
+                var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, httpContent);
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"토글 상태 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
         // ==================== OpenAI Whisper 관련 API ====================
 
         /// <summary>
@@ -501,21 +637,25 @@ namespace VoiceMacroPro.Services
         /// <summary>
         /// 요청 성공 여부
         /// </summary>
+        [JsonPropertyName("success")]
         public bool Success { get; set; }
 
         /// <summary>
         /// 응답 데이터
         /// </summary>
+        [JsonPropertyName("data")]
         public T? Data { get; set; }
 
         /// <summary>
         /// 응답 메시지
         /// </summary>
+        [JsonPropertyName("message")]
         public string? Message { get; set; }
 
         /// <summary>
         /// 오류 정보 (오류 발생 시)
         /// </summary>
+        [JsonPropertyName("error")]
         public string? Error { get; set; }
     }
 
@@ -707,5 +847,107 @@ namespace VoiceMacroPro.Services
                 return "정상 작동";
             }
         }
+    }
+
+    /// <summary>
+    /// 매크로 실행 상태 클래스
+    /// 현재 실행 중인 매크로들의 상태 정보를 담습니다.
+    /// </summary>
+    public class MacroExecutionStatus
+    {
+        /// <summary>
+        /// 서비스 활성화 여부
+        /// </summary>
+        [JsonProperty("service_active")]
+        public bool ServiceActive { get; set; }
+
+        /// <summary>
+        /// 실행 중인 매크로 개수
+        /// </summary>
+        [JsonProperty("running_macros_count")]
+        public int RunningMacrosCount { get; set; }
+
+        /// <summary>
+        /// 실행 중인 매크로 상세 목록
+        /// </summary>
+        [JsonProperty("running_macros")]
+        public List<RunningMacroInfo> RunningMacros { get; set; } = new List<RunningMacroInfo>();
+
+        /// <summary>
+        /// 토글 매크로들의 상태
+        /// </summary>
+        [JsonProperty("toggle_states")]
+        public Dictionary<int, bool> ToggleStates { get; set; } = new Dictionary<int, bool>();
+
+        /// <summary>
+        /// PyAutoGUI FAILSAFE 활성화 여부
+        /// </summary>
+        [JsonProperty("failsafe_enabled")]
+        public bool FailsafeEnabled { get; set; }
+
+        /// <summary>
+        /// 상태 조회 시간
+        /// </summary>
+        [JsonProperty("timestamp")]
+        public string Timestamp { get; set; } = "";
+    }
+
+    /// <summary>
+    /// 실행 중인 매크로 정보 클래스
+    /// </summary>
+    public class RunningMacroInfo
+    {
+        /// <summary>
+        /// 매크로 ID
+        /// </summary>
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        /// <summary>
+        /// 매크로 이름
+        /// </summary>
+        [JsonProperty("name")]
+        public string Name { get; set; } = "";
+
+        /// <summary>
+        /// 동작 타입
+        /// </summary>
+        [JsonProperty("action_type")]
+        public string ActionType { get; set; } = "";
+    }
+
+    /// <summary>
+    /// 토글 상태 클래스
+    /// 토글 매크로의 현재 상태 정보를 담습니다.
+    /// </summary>
+    public class ToggleState
+    {
+        /// <summary>
+        /// 매크로 ID
+        /// </summary>
+        [JsonProperty("macro_id")]
+        public int MacroId { get; set; }
+
+        /// <summary>
+        /// 매크로 이름
+        /// </summary>
+        [JsonProperty("macro_name")]
+        public string MacroName { get; set; } = "";
+
+        /// <summary>
+        /// 현재 ON/OFF 상태
+        /// </summary>
+        [JsonProperty("is_on")]
+        public bool IsOn { get; set; }
+
+        /// <summary>
+        /// UI 표시용 상태 텍스트
+        /// </summary>
+        public string StatusText => IsOn ? "ON" : "OFF";
+
+        /// <summary>
+        /// UI 표시용 상태 색상
+        /// </summary>
+        public string StatusColor => IsOn ? "#4CAF50" : "#F44336"; // 초록/빨강
     }
 } 

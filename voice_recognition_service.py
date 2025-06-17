@@ -50,33 +50,111 @@ class VoiceRecognitionService:
         self.logger.info("음성 인식 서비스가 초기화되었습니다.")
     
     def _initialize_audio_devices(self):
-        """사용 가능한 오디오 장치 초기화"""
+        """사용 가능한 오디오 장치 초기화 (안전한 방법)"""
         try:
             # 사용 가능한 입력 장치 목록 가져오기
             devices = sd.query_devices()
             self.available_devices = []
             
+            # 알려진 마이크 키워드들
+            mic_keywords = ['마이크', 'mic', 'microphone', 'input', '입력', 'capture', 'record']
+            
             for idx, device in enumerate(devices):
-                # 입력 채널이 있는 장치만 추가
-                if device['max_input_channels'] > 0:
-                    device_info = {
-                        'id': idx,
-                        'name': device['name'],
-                        'max_input_channels': device['max_input_channels'],
-                        'default_samplerate': device['default_samplerate']
-                    }
-                    self.available_devices.append(device_info)
+                try:
+                    # 안전한 방법으로 장치 정보 접근
+                    device_name = device.get('name', 'Unknown Device')
+                    max_inputs = device.get('max_inputs', 0)
+                    max_input_channels = device.get('max_input_channels', 0)
+                    default_samplerate = device.get('default_samplerate', 44100)
+                    
+                    # 입력 장치 감지 방법 개선
+                    is_input_device = False
+                    
+                    # 방법 1: max_input_channels 또는 max_inputs 확인
+                    if max_input_channels > 0 or max_inputs > 0:
+                        is_input_device = True
+                    
+                    # 방법 2: 이름에 마이크 관련 키워드가 포함된 경우
+                    elif any(keyword in device_name.lower() for keyword in mic_keywords):
+                        is_input_device = True
+                    
+                    # 방법 3: 실제 녹음 테스트로 확인 (안전한 방법)
+                    elif self._test_device_input_capability(idx):
+                        is_input_device = True
+                    
+                    if is_input_device:
+                        device_info = {
+                            'id': idx,
+                            'name': device_name,
+                            'max_input_channels': max(max_input_channels, max_inputs, 1),  # 최소 1로 설정
+                            'default_samplerate': default_samplerate
+                        }
+                        self.available_devices.append(device_info)
+                        self.logger.debug(f"입력 장치 발견: [{idx}] {device_name}")
+                    
+                except Exception as e:
+                    self.logger.debug(f"장치 [{idx}] 정보 읽기 실패: {e}")
+                    continue
             
             # 기본 입력 장치 설정
             if self.available_devices:
-                default_device = sd.query_devices(kind='input')
-                self.current_device_id = default_device['name']
-                self.logger.info(f"기본 마이크 장치 설정: {self.current_device_id}")
+                # 첫 번째 사용 가능한 장치를 기본으로 설정
+                default_device = self.available_devices[0]
+                self.current_device_id = default_device['id']
+                self.logger.info(f"기본 마이크 장치 설정: [{default_device['id']}] {default_device['name']}")
+                self.logger.info(f"총 {len(self.available_devices)}개의 입력 장치가 발견되었습니다.")
             else:
-                self.logger.warning("사용 가능한 마이크 장치가 없습니다.")
+                self.logger.warning("사용 가능한 마이크 장치가 없습니다. 기본 장치로 시도합니다.")
+                # 기본 장치라도 추가 (sounddevice가 자동으로 선택)
+                self.available_devices.append({
+                    'id': None,  # None은 기본 장치를 의미
+                    'name': '시스템 기본 마이크',
+                    'max_input_channels': 1,
+                    'default_samplerate': 16000
+                })
+                self.current_device_id = None
                 
         except Exception as e:
             self.logger.error(f"오디오 장치 초기화 실패: {e}")
+            # 최후의 수단: 기본 장치만 추가
+            self.available_devices = [{
+                'id': None,
+                'name': '시스템 기본 마이크 (자동 감지)',
+                'max_input_channels': 1,
+                'default_samplerate': 16000
+            }]
+            self.current_device_id = None
+    
+    def _test_device_input_capability(self, device_id: int) -> bool:
+        """
+        특정 장치의 입력 기능을 실제로 테스트하는 함수
+        
+        Args:
+            device_id (int): 테스트할 장치 ID
+            
+        Returns:
+            bool: 입력 기능이 있는 경우 True
+        """
+        try:
+            # 아주 짧은 시간(0.1초) 동안 녹음 테스트
+            test_duration = 0.1
+            test_samplerate = 16000
+            
+            test_data = sd.rec(
+                int(test_duration * test_samplerate),
+                samplerate=test_samplerate,
+                channels=1,
+                device=device_id,
+                dtype='float32'
+            )
+            sd.wait()  # 녹음 완료 대기
+            
+            # 녹음이 성공하면 입력 장치임
+            return True
+            
+        except Exception:
+            # 녹음이 실패하면 입력 장치가 아님
+            return False
     
     def get_available_devices(self) -> List[Dict]:
         """

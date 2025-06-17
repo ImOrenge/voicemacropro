@@ -370,13 +370,23 @@
                             <!-- 마이크 테스트 버튼 -->
                             <StackPanel Grid.Column="3">
                                 <TextBlock Text="🔧 테스트" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <Button Name="TestMicrophoneButton"
-                                       Content="🧪 마이크 테스트" 
-                                       Padding="15,8" 
-                                       Background="#17A2B8" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       Click="TestMicrophoneButton_Click"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Name="TestMicrophoneButton"
+                                           Content="🧪 마이크 테스트" 
+                                           Padding="15,8" 
+                                           Background="#17A2B8" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Margin="0,0,5,0"
+                                           Click="TestMicrophoneButton_Click"/>
+                                    <Button Name="RefreshMicrophoneButton"
+                                           Content="🔄 새로고침" 
+                                           Padding="10,8" 
+                                           Background="#28A745" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Click="RefreshMicrophoneButton_Click"/>
+                                </StackPanel>
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -692,13 +702,572 @@
                 </Grid>
             </TabItem>
             
+            <!-- PRD 3.3 매크로 동작 메커니즘 설정 -->
             <TabItem Header="⚙️ 매크로 설정" FontSize="14" Padding="15,10">
-                <Grid>
-                    <TextBlock Text="매크로 설정 기능 (추후 구현 예정)" 
-                              HorizontalAlignment="Center" 
-                              VerticalAlignment="Center" 
-                              FontSize="16" 
-                              Foreground="#7F8C8D"/>
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 매크로 기본 정보 입력 -->
+                    <Border Grid.Row="0" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 매크로 이름 -->
+                            <StackPanel Grid.Column="0" Margin="0,0,15,0">
+                                <TextBlock Text="📝 매크로 이름" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+                                <TextBox Name="MacroNameTextBox" 
+                                        Height="35"
+                                        FontSize="14"
+                                        VerticalContentAlignment="Center"
+                                        Text="{Binding MacroName, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            
+                            <!-- 음성 명령어 -->
+                            <StackPanel Grid.Column="1" Margin="0,0,15,0">
+                                <TextBlock Text="🎤 음성 명령어" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+                                <TextBox Name="VoiceCommandTextBox" 
+                                        Height="35"
+                                        FontSize="14"
+                                        VerticalContentAlignment="Center"
+                                        Text="{Binding VoiceCommand, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                            
+                            <!-- 매크로 설명 -->
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="📄 매크로 설명" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
+                                <TextBox Name="MacroDescriptionTextBox" 
+                                        Height="35"
+                                        FontSize="14"
+                                        VerticalContentAlignment="Center"
+                                        Text="{Binding MacroDescription, UpdateSourceTrigger=PropertyChanged}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 매크로 타입 선택 -->
+                    <Border Grid.Row="1" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
+                        <StackPanel>
+                            <TextBlock Text="🎮 매크로 타입 선택" FontWeight="Bold" FontSize="16" Margin="0,0,0,15"/>
+                            
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <RadioButton Name="ComboRadioButton" 
+                                           Content="⚡ 콤보" 
+                                           Margin="0,0,30,0" 
+                                           FontSize="14" 
+                                           FontWeight="Bold"
+                                           IsChecked="True"
+                                           Checked="MacroTypeRadioButton_Checked"
+                                           Tag="Combo"/>
+                                <RadioButton Name="RapidRadioButton" 
+                                           Content="🔥 연사" 
+                                           Margin="0,0,30,0" 
+                                           FontSize="14" 
+                                           FontWeight="Bold"
+                                           Checked="MacroTypeRadioButton_Checked"
+                                           Tag="Rapid"/>
+                                <RadioButton Name="HoldRadioButton" 
+                                           Content="🔒 홀드" 
+                                           Margin="0,0,30,0" 
+                                           FontSize="14" 
+                                           FontWeight="Bold"
+                                           Checked="MacroTypeRadioButton_Checked"
+                                           Tag="Hold"/>
+                                <RadioButton Name="ToggleRadioButton" 
+                                           Content="🔄 토글" 
+                                           Margin="0,0,30,0" 
+                                           FontSize="14" 
+                                           FontWeight="Bold"
+                                           Checked="MacroTypeRadioButton_Checked"
+                                           Tag="Toggle"/>
+                                <RadioButton Name="RepeatRadioButton" 
+                                           Content="🔁 반복" 
+                                           FontSize="14" 
+                                           FontWeight="Bold"
+                                           Checked="MacroTypeRadioButton_Checked"
+                                           Tag="Repeat"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 타입별 설정 패널 -->
+                    <Border Grid.Row="2" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
+                        <Grid>
+                            <!-- 콤보 설정 패널 -->
+                            <StackPanel Name="ComboSettingsPanel" Visibility="Visible">
+                                <TextBlock Text="⚡ 콤보 설정 - 키 순서와 딜레이" FontWeight="Bold" FontSize="16" Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 기본 딜레이 설정 -->
+                                    <Grid Grid.Row="0" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="⏱️ 기본 딜레이:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <Slider Grid.Column="1" 
+                                               Name="ComboDefaultDelaySlider"
+                                               Minimum="1" 
+                                               Maximum="1000" 
+                                               Value="100"
+                                               TickFrequency="50"
+                                               ValueChanged="ComboDefaultDelaySlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="ComboDefaultDelayText"
+                                                  Text="100ms" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="10,0,0,0"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 콤보 단계 목록 -->
+                                    <DataGrid Grid.Row="1" 
+                                             Name="ComboStepsDataGrid"
+                                             Height="200"
+                                             AutoGenerateColumns="False"
+                                             CanUserAddRows="True"
+                                             CanUserDeleteRows="True"
+                                             GridLinesVisibility="All"
+                                             HeadersVisibility="Column"
+                                             FontSize="12">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="순서" 
+                                                               Width="60" 
+                                                               IsReadOnly="True"
+                                                               Binding="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=Header}"/>
+                                            <DataGridTextColumn Header="키 시퀀스" 
+                                                               Width="200" 
+                                                               Binding="{Binding KeySequence}"/>
+                                            <DataGridTextColumn Header="딜레이 (ms)" 
+                                                               Width="100" 
+                                                               Binding="{Binding DelayAfterMs}"/>
+                                            <DataGridTextColumn Header="설명" 
+                                                               Width="*" 
+                                                               Binding="{Binding Description}"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    
+                                    <!-- 콤보 단계 조작 버튼 -->
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,15,0,0">
+                                        <Button Name="AddComboStepButton"
+                                               Content="➕ 단계 추가" 
+                                               Margin="0,0,10,0" 
+                                               Padding="15,8" 
+                                               Background="#28A745" 
+                                               Foreground="White" 
+                                               BorderThickness="0"
+                                               Click="AddComboStepButton_Click"/>
+                                        <Button Name="RemoveComboStepButton"
+                                               Content="➖ 단계 삭제" 
+                                               Margin="0,0,10,0" 
+                                               Padding="15,8" 
+                                               Background="#DC3545" 
+                                               Foreground="White" 
+                                               BorderThickness="0"
+                                               Click="RemoveComboStepButton_Click"/>
+                                        <Button Name="TestComboButton"
+                                               Content="🧪 테스트" 
+                                               Padding="15,8" 
+                                               Background="#17A2B8" 
+                                               Foreground="White" 
+                                               BorderThickness="0"
+                                               Click="TestComboButton_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- 연사 설정 패널 -->
+                            <StackPanel Name="RapidSettingsPanel" Visibility="Collapsed">
+                                <TextBlock Text="🔥 연사 설정 - 속도와 지속시간" FontWeight="Bold" FontSize="16" Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 키 시퀀스 -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                        <TextBlock Text="⌨️ 연사할 키:" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        <TextBox Name="RapidKeySequenceTextBox" 
+                                                Height="35"
+                                                FontSize="14"
+                                                VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 연사 속도 -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="⚡ 연사 속도:" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        <Slider Grid.Column="1" 
+                                               Name="RapidCpsSlider"
+                                               Minimum="0.1" 
+                                               Maximum="50" 
+                                               Value="10"
+                                               TickFrequency="1"
+                                               ValueChanged="RapidCpsSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="RapidCpsText"
+                                                  Text="10 CPS" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="15,0,0,0"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 지속 시간 -->
+                                    <Grid Grid.Row="2" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="⏰ 지속 시간:" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        <Slider Grid.Column="1" 
+                                               Name="RapidDurationSlider"
+                                               Minimum="0.1" 
+                                               Maximum="10" 
+                                               Value="1"
+                                               TickFrequency="0.1"
+                                               ValueChanged="RapidDurationSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="RapidDurationText"
+                                                  Text="1.0초" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="15,0,0,0"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 고정 지속시간 옵션 -->
+                                    <CheckBox Grid.Row="3" 
+                                             Name="RapidUseFixedDurationCheckBox"
+                                             Content="🔒 고정 지속시간 사용 (체크 해제시 다시 명령어를 말할 때까지 계속 연사)" 
+                                             IsChecked="True"
+                                             Margin="0,0,0,15"/>
+                                    
+                                    <!-- 테스트 버튼 -->
+                                    <Button Grid.Row="4" 
+                                           Name="TestRapidButton"
+                                           Content="🧪 연사 테스트" 
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Top"
+                                           Padding="20,10" 
+                                           Background="#17A2B8" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Click="TestRapidButton_Click"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- 홀드 설정 패널 -->
+                            <StackPanel Name="HoldSettingsPanel" Visibility="Collapsed">
+                                <TextBlock Text="🔒 홀드 설정 - 지속시간과 해제조건" FontWeight="Bold" FontSize="16" Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 키 시퀀스 -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                        <TextBlock Text="⌨️ 홀드할 키:" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        <TextBox Name="HoldKeySequenceTextBox" 
+                                                Height="35"
+                                                FontSize="14"
+                                                VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 홀드 지속시간 -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="300"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="⏰ 홀드 시간:" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        <Slider Grid.Column="1" 
+                                               Name="HoldDurationSlider"
+                                               Minimum="0.1" 
+                                               Maximum="30" 
+                                               Value="1"
+                                               TickFrequency="0.5"
+                                               ValueChanged="HoldDurationSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="HoldDurationText"
+                                                  Text="1.0초" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="15,0,0,0"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 고정 지속시간 옵션 -->
+                                    <CheckBox Grid.Row="2" 
+                                             Name="HoldUseFixedDurationCheckBox"
+                                             Content="🔒 고정 지속시간 사용" 
+                                             IsChecked="True"
+                                             Margin="0,0,0,15"
+                                             Checked="HoldUseFixedDurationCheckBox_Checked"
+                                             Unchecked="HoldUseFixedDurationCheckBox_Unchecked"/>
+                                    
+                                    <!-- 해제 명령어 -->
+                                    <StackPanel Grid.Row="3" Name="HoldReleaseCommandPanel" Margin="0,0,0,15" IsEnabled="False">
+                                        <TextBlock Text="🗣️ 해제 명령어:" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        <TextBox Name="HoldReleaseCommandTextBox" 
+                                                Height="35"
+                                                FontSize="14"
+                                                VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 테스트 버튼 -->
+                                    <Button Grid.Row="4" 
+                                           Name="TestHoldButton"
+                                           Content="🧪 홀드 테스트" 
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Top"
+                                           Padding="20,10" 
+                                           Background="#17A2B8" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Click="TestHoldButton_Click"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- 토글 설정 패널 -->
+                            <StackPanel Name="ToggleSettingsPanel" Visibility="Collapsed">
+                                <TextBlock Text="🔄 토글 설정 - 상태표시와 해제명령" FontWeight="Bold" FontSize="16" Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 키 시퀀스 -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                        <TextBlock Text="⌨️ 토글할 키:" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        <TextBox Name="ToggleKeySequenceTextBox" 
+                                                Height="35"
+                                                FontSize="14"
+                                                VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 토글 해제 명령어 -->
+                                    <StackPanel Grid.Row="1" Margin="0,0,0,15">
+                                        <TextBlock Text="🗣️ 해제 명령어 (선택사항):" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        <TextBox Name="ToggleOffCommandTextBox" 
+                                                Height="35"
+                                                FontSize="14"
+                                                VerticalContentAlignment="Center"/>
+                                        <TextBlock Text="💡 비워두면 동일한 명령어로 ON/OFF 전환됩니다" 
+                                                  FontSize="11" 
+                                                  Foreground="#6C757D" 
+                                                  Margin="0,5,0,0"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 상태 표시기 옵션 -->
+                                    <CheckBox Grid.Row="2" 
+                                             Name="ToggleShowStatusCheckBox"
+                                             Content="📊 상태 표시기 사용 (UI에 ON/OFF 상태 표시)" 
+                                             IsChecked="True"
+                                             Margin="0,0,0,15"/>
+                                    
+                                    <!-- 현재 토글 상태 -->
+                                    <Grid Grid.Row="3" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="🚦 현재 상태:" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        <Ellipse Grid.Column="1" 
+                                                Name="ToggleStatusIndicator"
+                                                Width="20" 
+                                                Height="20" 
+                                                Fill="#DC3545"
+                                                VerticalAlignment="Center"
+                                                Margin="0,0,10,0"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="ToggleStatusText"
+                                                  Text="OFF" 
+                                                  VerticalAlignment="Center"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 테스트 버튼 -->
+                                    <Button Grid.Row="4" 
+                                           Name="TestToggleButton"
+                                           Content="🧪 토글 테스트" 
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Top"
+                                           Padding="20,10" 
+                                           Background="#17A2B8" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Click="TestToggleButton_Click"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- 반복 설정 패널 -->
+                            <StackPanel Name="RepeatSettingsPanel" Visibility="Collapsed">
+                                <TextBlock Text="🔁 반복 설정 - 횟수와 간격" FontWeight="Bold" FontSize="16" Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 키 시퀀스 -->
+                                    <StackPanel Grid.Row="0" Margin="0,0,0,15">
+                                        <TextBlock Text="⌨️ 반복할 키:" FontWeight="Bold" Margin="0,0,0,8"/>
+                                        <TextBox Name="RepeatKeySequenceTextBox" 
+                                                Height="35"
+                                                FontSize="14"
+                                                VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 반복 횟수 -->
+                                    <Grid Grid.Row="1" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="🔢 반복 횟수:" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        <Slider Grid.Column="1" 
+                                               Name="RepeatCountSlider"
+                                               Minimum="1" 
+                                               Maximum="100" 
+                                               Value="3"
+                                               TickFrequency="1"
+                                               ValueChanged="RepeatCountSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="RepeatCountText"
+                                                  Text="3회" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="15,0,0,0"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 반복 간격 -->
+                                    <Grid Grid.Row="2" Margin="0,0,0,15">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="200"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <TextBlock Grid.Column="0" Text="⏰ 반복 간격:" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                                        <Slider Grid.Column="1" 
+                                               Name="RepeatIntervalSlider"
+                                               Minimum="0.1" 
+                                               Maximum="5" 
+                                               Value="0.5"
+                                               TickFrequency="0.1"
+                                               ValueChanged="RepeatIntervalSlider_ValueChanged"/>
+                                        <TextBlock Grid.Column="2" 
+                                                  Name="RepeatIntervalText"
+                                                  Text="0.5초" 
+                                                  VerticalAlignment="Center" 
+                                                  Margin="15,0,0,0"
+                                                  FontWeight="Bold"/>
+                                    </Grid>
+                                    
+                                    <!-- 다음 명령 시 중단 옵션 -->
+                                    <CheckBox Grid.Row="3" 
+                                             Name="RepeatStopOnNextCommandCheckBox"
+                                             Content="⏹️ 다음 음성 명령 시 반복 중단" 
+                                             IsChecked="False"
+                                             Margin="0,0,0,15"/>
+                                    
+                                    <!-- 테스트 버튼 -->
+                                    <Button Grid.Row="4" 
+                                           Name="TestRepeatButton"
+                                           Content="🧪 반복 테스트" 
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Top"
+                                           Padding="20,10" 
+                                           Background="#17A2B8" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Click="TestRepeatButton_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 매크로 저장/취소 버튼 -->
+                    <Border Grid.Row="3" Background="White" Padding="20" CornerRadius="8">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Name="SaveMacroSettingsButton"
+                                   Content="💾 매크로 저장" 
+                                   Margin="0,0,15,0" 
+                                   Padding="25,12" 
+                                   Background="#28A745" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   FontWeight="Bold"
+                                   FontSize="14"
+                                   Click="SaveMacroSettingsButton_Click"/>
+                            <Button Name="CancelMacroSettingsButton"
+                                   Content="❌ 취소" 
+                                   Margin="0,0,15,0" 
+                                   Padding="25,12" 
+                                   Background="#6C757D" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   FontWeight="Bold"
+                                   FontSize="14"
+                                   Click="CancelMacroSettingsButton_Click"/>
+                            <Button Name="PreviewMacroButton"
+                                   Content="👁️ 미리보기" 
+                                   Padding="25,12" 
+                                   Background="#17A2B8" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   FontWeight="Bold"
+                                   FontSize="14"
+                                   Click="PreviewMacroButton_Click"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </TabItem>
             

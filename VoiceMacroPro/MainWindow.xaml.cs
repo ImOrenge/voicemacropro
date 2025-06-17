@@ -11,6 +11,7 @@ using Microsoft.Win32;
 using VoiceMacroPro.Models;
 using VoiceMacroPro.Services;
 using VoiceMacroPro.Views;
+using System.Collections.ObjectModel;
 
 namespace VoiceMacroPro
 {
@@ -32,6 +33,15 @@ namespace VoiceMacroPro
         private List<VoiceMatchResult> _currentMatchResults = new List<VoiceMatchResult>();
         private bool _isRecording = false;
         private System.Windows.Threading.DispatcherTimer? _statusUpdateTimer;
+
+        // ==================== 매크로 설정 관련 필드 ====================
+        private MacroActionType _currentMacroType = MacroActionType.Combo;
+        private ComboActionSettings _comboSettings = new();
+        private RapidActionSettings _rapidSettings = new();
+        private HoldActionSettings _holdSettings = new();
+        private ToggleActionSettings _toggleSettings = new();
+        private RepeatActionSettings _repeatSettings = new();
+        private ObservableCollection<ComboStep> _comboSteps = new();
 
         /// <summary>
         /// 메인 윈도우 생성자
@@ -1089,7 +1099,6 @@ namespace VoiceMacroPro
 
         /// <summary>
         /// 마이크 테스트 버튼 클릭 이벤트 핸들러
-        /// 테스트 전에 자동으로 마이크 장치를 설정합니다.
         /// </summary>
         private async void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
         {
@@ -1517,6 +1526,802 @@ namespace VoiceMacroPro
             {
                 _loggingService.LogError($"❌ 마이크 장치 설정 확인 중 오류: {ex.Message}");
             }
+        }
+
+        // ==================== 매크로 설정 이벤트 핸들러 ====================
+
+        /// <summary>
+        /// 매크로 타입 라디오 버튼 선택 시 호출되는 이벤트 핸들러
+        /// 선택된 타입에 따라 해당 설정 패널을 표시합니다.
+        /// </summary>
+        private void MacroTypeRadioButton_Checked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (sender is RadioButton radioButton && radioButton.Tag is string macroTypeStr)
+                {
+                    if (Enum.TryParse<MacroActionType>(macroTypeStr, out var macroType))
+                    {
+                        _currentMacroType = macroType;
+                        ShowMacroSettingsPanel(macroType);
+                        _loggingService.LogInfo($"매크로 타입이 '{macroType}'으로 변경되었습니다.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 타입 선택 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"매크로 타입 선택 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 선택된 매크로 타입에 따라 해당 설정 패널을 표시하는 함수
+        /// </summary>
+        private void ShowMacroSettingsPanel(MacroActionType macroType)
+        {
+            try
+            {
+                // 모든 패널 숨기기
+                if (ComboSettingsPanel != null) ComboSettingsPanel.Visibility = Visibility.Collapsed;
+                if (RapidSettingsPanel != null) RapidSettingsPanel.Visibility = Visibility.Collapsed;
+                if (HoldSettingsPanel != null) HoldSettingsPanel.Visibility = Visibility.Collapsed;
+                if (ToggleSettingsPanel != null) ToggleSettingsPanel.Visibility = Visibility.Collapsed;
+                if (RepeatSettingsPanel != null) RepeatSettingsPanel.Visibility = Visibility.Collapsed;
+
+                // 선택된 타입에 따라 해당 패널 표시
+                switch (macroType)
+                {
+                    case MacroActionType.Combo:
+                        if (ComboSettingsPanel != null) ComboSettingsPanel.Visibility = Visibility.Visible;
+                        InitializeComboSettings();
+                        break;
+                    case MacroActionType.Rapid:
+                        if (RapidSettingsPanel != null) RapidSettingsPanel.Visibility = Visibility.Visible;
+                        break;
+                    case MacroActionType.Hold:
+                        if (HoldSettingsPanel != null) HoldSettingsPanel.Visibility = Visibility.Visible;
+                        break;
+                    case MacroActionType.Toggle:
+                        if (ToggleSettingsPanel != null) ToggleSettingsPanel.Visibility = Visibility.Visible;
+                        break;
+                    case MacroActionType.Repeat:
+                        if (RepeatSettingsPanel != null) RepeatSettingsPanel.Visibility = Visibility.Visible;
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 설정 패널 표시 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 콤보 설정을 초기화하는 함수
+        /// </summary>
+        private void InitializeComboSettings()
+        {
+            try
+            {
+                if (ComboStepsDataGrid != null)
+                {
+                    ComboStepsDataGrid.ItemsSource = _comboSteps;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"콤보 설정 초기화 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        // ==================== 콤보 설정 이벤트 핸들러 ====================
+
+        /// <summary>
+        /// 콤보 기본 딜레이 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void ComboDefaultDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                var delayMs = (int)e.NewValue;
+                _comboSettings.DefaultDelayMs = delayMs;
+                
+                if (ComboDefaultDelayText != null)
+                {
+                    ComboDefaultDelayText.Text = $"{delayMs}ms";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"콤보 딜레이 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 콤보 단계 추가 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private void AddComboStepButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var newStep = new ComboStep
+                {
+                    KeySequence = "키를 입력하세요",
+                    DelayAfterMs = _comboSettings.DefaultDelayMs,
+                    Description = "단계 설명"
+                };
+                
+                _comboSteps.Add(newStep);
+                _loggingService.LogInfo($"새 콤보 단계가 추가되었습니다. 총 {_comboSteps.Count}개 단계");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"콤보 단계 추가 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"콤보 단계 추가 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 콤보 단계 삭제 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private void RemoveComboStepButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (ComboStepsDataGrid?.SelectedItem is ComboStep selectedStep)
+                {
+                    _comboSteps.Remove(selectedStep);
+                    _loggingService.LogInfo($"콤보 단계가 삭제되었습니다. 총 {_comboSteps.Count}개 단계");
+                }
+                else
+                {
+                    MessageBox.Show("삭제할 단계를 선택해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"콤보 단계 삭제 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"콤보 단계 삭제 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 콤보 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestComboButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_comboSteps.Count == 0)
+                {
+                    MessageBox.Show("테스트할 콤보 단계가 없습니다.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var result = MessageBox.Show("콤보를 테스트하시겠습니까?\n3초 후 콤보가 실행됩니다.", 
+                                           "콤보 테스트", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    _loggingService.LogInfo("콤보 테스트 시작");
+                    
+                    // 3초 대기
+                    await Task.Delay(3000);
+                    
+                    // TODO: 실제 콤보 실행 로직 구현 (PyAutoGUI 호출)
+                    foreach (var step in _comboSteps)
+                    {
+                        _loggingService.LogInfo($"콤보 단계 실행: {step.KeySequence}");
+                        // 실제 키 입력 실행
+                        await Task.Delay(step.DelayAfterMs);
+                    }
+                    
+                    _loggingService.LogInfo("콤보 테스트 완료");
+                    MessageBox.Show("콤보 테스트가 완료되었습니다.", "테스트 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"콤보 테스트 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"콤보 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ==================== 연사 설정 이벤트 핸들러 ====================
+
+        /// <summary>
+        /// 연사 속도 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RapidCpsSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                var cps = Math.Round(e.NewValue, 1);
+                _rapidSettings.ClicksPerSecond = cps;
+                
+                if (RapidCpsText != null)
+                {
+                    RapidCpsText.Text = $"{cps} CPS";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"연사 속도 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 연사 지속시간 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RapidDurationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                var duration = Math.Round(e.NewValue, 1);
+                _rapidSettings.DurationSeconds = duration;
+                
+                if (RapidDurationText != null)
+                {
+                    RapidDurationText.Text = $"{duration}초";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"연사 지속시간 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 연사 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestRapidButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(RapidKeySequenceTextBox?.Text))
+                {
+                    MessageBox.Show("연사할 키를 입력해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var result = MessageBox.Show($"연사를 테스트하시겠습니까?\n" +
+                                           $"키: {RapidKeySequenceTextBox.Text}\n" +
+                                           $"속도: {_rapidSettings.ClicksPerSecond} CPS\n" +
+                                           $"지속시간: {_rapidSettings.DurationSeconds}초", 
+                                           "연사 테스트", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    _loggingService.LogInfo($"연사 테스트 시작: {RapidKeySequenceTextBox.Text}");
+                    
+                    // 3초 대기
+                    await Task.Delay(3000);
+                    
+                    // TODO: 실제 연사 실행 로직 구현
+                    _loggingService.LogInfo("연사 테스트 완료");
+                    MessageBox.Show("연사 테스트가 완료되었습니다.", "테스트 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"연사 테스트 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"연사 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ==================== 홀드 설정 이벤트 핸들러 ====================
+
+        /// <summary>
+        /// 홀드 지속시간 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void HoldDurationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                var duration = Math.Round(e.NewValue, 1);
+                _holdSettings.HoldDurationSeconds = duration;
+                
+                if (HoldDurationText != null)
+                {
+                    HoldDurationText.Text = $"{duration}초";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"홀드 지속시간 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 홀드 고정시간 체크박스 체크 이벤트 핸들러
+        /// </summary>
+        private void HoldUseFixedDurationCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _holdSettings.UseFixedDuration = true;
+                if (HoldReleaseCommandPanel != null)
+                {
+                    HoldReleaseCommandPanel.IsEnabled = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"홀드 고정시간 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 홀드 고정시간 체크박스 언체크 이벤트 핸들러
+        /// </summary>
+        private void HoldUseFixedDurationCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _holdSettings.UseFixedDuration = false;
+                if (HoldReleaseCommandPanel != null)
+                {
+                    HoldReleaseCommandPanel.IsEnabled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"홀드 고정시간 해제 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 홀드 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestHoldButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(HoldKeySequenceTextBox?.Text))
+                {
+                    MessageBox.Show("홀드할 키를 입력해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var result = MessageBox.Show($"홀드를 테스트하시겠습니까?\n" +
+                                           $"키: {HoldKeySequenceTextBox.Text}\n" +
+                                           $"지속시간: {_holdSettings.HoldDurationSeconds}초", 
+                                           "홀드 테스트", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    _loggingService.LogInfo($"홀드 테스트 시작: {HoldKeySequenceTextBox.Text}");
+                    
+                    // 3초 대기
+                    await Task.Delay(3000);
+                    
+                    // TODO: 실제 홀드 실행 로직 구현
+                    _loggingService.LogInfo("홀드 테스트 완료");
+                    MessageBox.Show("홀드 테스트가 완료되었습니다.", "테스트 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"홀드 테스트 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"홀드 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ==================== 토글 설정 이벤트 핸들러 ====================
+
+        /// <summary>
+        /// 토글 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(ToggleKeySequenceTextBox?.Text))
+                {
+                    MessageBox.Show("토글할 키를 입력해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 토글 상태 변경
+                _toggleSettings.IsCurrentlyOn = !_toggleSettings.IsCurrentlyOn;
+                
+                // UI 업데이트
+                UpdateToggleStatusUI();
+                
+                _loggingService.LogInfo($"토글 테스트: {ToggleKeySequenceTextBox.Text} - 상태: {(_toggleSettings.IsCurrentlyOn ? "ON" : "OFF")}");
+                
+                // TODO: 실제 토글 실행 로직 구현
+                MessageBox.Show($"토글 상태가 {(_toggleSettings.IsCurrentlyOn ? "ON" : "OFF")}으로 변경되었습니다.", 
+                              "토글 테스트", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"토글 테스트 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"토글 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 토글 상태 UI를 업데이트하는 함수
+        /// </summary>
+        private void UpdateToggleStatusUI()
+        {
+            try
+            {
+                if (ToggleStatusIndicator != null && ToggleStatusText != null)
+                {
+                    if (_toggleSettings.IsCurrentlyOn)
+                    {
+                        ToggleStatusIndicator.Fill = new SolidColorBrush(Colors.Green);
+                        ToggleStatusText.Text = "ON";
+                    }
+                    else
+                    {
+                        ToggleStatusIndicator.Fill = new SolidColorBrush(Colors.Red);
+                        ToggleStatusText.Text = "OFF";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"토글 상태 UI 업데이트 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        // ==================== 반복 설정 이벤트 핸들러 ====================
+
+        /// <summary>
+        /// 반복 횟수 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RepeatCountSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                var count = (int)e.NewValue;
+                _repeatSettings.RepeatCount = count;
+                
+                if (RepeatCountText != null)
+                {
+                    RepeatCountText.Text = $"{count}회";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"반복 횟수 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 반복 간격 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RepeatIntervalSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                var interval = Math.Round(e.NewValue, 1);
+                _repeatSettings.IntervalSeconds = interval;
+                
+                if (RepeatIntervalText != null)
+                {
+                    RepeatIntervalText.Text = $"{interval}초";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"반복 간격 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 반복 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestRepeatButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(RepeatKeySequenceTextBox?.Text))
+                {
+                    MessageBox.Show("반복할 키를 입력해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var result = MessageBox.Show($"반복을 테스트하시겠습니까?\n" +
+                                           $"키: {RepeatKeySequenceTextBox.Text}\n" +
+                                           $"횟수: {_repeatSettings.RepeatCount}회\n" +
+                                           $"간격: {_repeatSettings.IntervalSeconds}초", 
+                                           "반복 테스트", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    _loggingService.LogInfo($"반복 테스트 시작: {RepeatKeySequenceTextBox.Text}");
+                    
+                    // 3초 대기
+                    await Task.Delay(3000);
+                    
+                    // TODO: 실제 반복 실행 로직 구현
+                    for (int i = 0; i < _repeatSettings.RepeatCount; i++)
+                    {
+                        _loggingService.LogInfo($"반복 실행 {i + 1}/{_repeatSettings.RepeatCount}");
+                        await Task.Delay((int)(_repeatSettings.IntervalSeconds * 1000));
+                    }
+                    
+                    _loggingService.LogInfo("반복 테스트 완료");
+                    MessageBox.Show("반복 테스트가 완료되었습니다.", "테스트 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"반복 테스트 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"반복 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ==================== 매크로 저장/취소/미리보기 ====================
+
+        /// <summary>
+        /// 매크로 저장 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void SaveMacroSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 기본 정보 검증
+                if (string.IsNullOrWhiteSpace(MacroNameTextBox?.Text))
+                {
+                    MessageBox.Show("매크로 이름을 입력해주세요.", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MacroNameTextBox?.Focus();
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(VoiceCommandTextBox?.Text))
+                {
+                    MessageBox.Show("음성 명령어를 입력해주세요.", "입력 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    VoiceCommandTextBox?.Focus();
+                    return;
+                }
+
+                // 현재 설정 유효성 검증
+                IMacroActionSettings currentSettings = GetCurrentMacroSettings();
+                if (!currentSettings.IsValid(out string errorMessage))
+                {
+                    MessageBox.Show($"매크로 설정이 올바르지 않습니다:\n{errorMessage}", 
+                                  "설정 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 새 매크로 객체 생성
+                var newMacro = new Macro
+                {
+                    Name = MacroNameTextBox.Text.Trim(),
+                    VoiceCommand = VoiceCommandTextBox.Text.Trim(),
+                    ActionType = _currentMacroType.ToString().ToLower(),
+                    KeySequence = GetKeySequenceFromCurrentSettings(),
+                    Settings = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, object>>(
+                        currentSettings.ToJsonString()) ?? new Dictionary<string, object>(),
+                    CreatedAt = DateTime.Now,
+                    UpdatedAt = DateTime.Now,
+                    UsageCount = 0
+                };
+
+                // API를 통해 매크로 저장
+                _loggingService.LogInfo($"새 매크로 저장 시도: {newMacro.Name}");
+                int macroId = await _apiService.CreateMacroAsync(newMacro);
+                bool success = macroId > 0;
+
+                if (success)
+                {
+                    _loggingService.LogInfo($"매크로 저장 성공: {newMacro.Name}");
+                    MessageBox.Show("매크로가 성공적으로 저장되었습니다!", "저장 완료", 
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                    
+                    // 매크로 목록 새로고침
+                    await LoadMacros();
+                    
+                    // 입력 필드 초기화
+                    ClearMacroSettings();
+                }
+                else
+                {
+                    _loggingService.LogError($"매크로 저장 실패: {newMacro.Name}");
+                    MessageBox.Show("매크로 저장에 실패했습니다. 다시 시도해주세요.", "저장 실패", 
+                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 저장 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"매크로 저장 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 매크로 설정 취소 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private void CancelMacroSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var result = MessageBox.Show("변경사항을 취소하시겠습니까?", "취소 확인", 
+                                           MessageBoxButton.YesNo, MessageBoxImage.Question);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    ClearMacroSettings();
+                    _loggingService.LogInfo("매크로 설정이 취소되었습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 설정 취소 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 미리보기 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private void PreviewMacroButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                IMacroActionSettings currentSettings = GetCurrentMacroSettings();
+                string previewText = GenerateMacroPreviewText(currentSettings);
+                
+                MessageBox.Show(previewText, "매크로 미리보기", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 미리보기 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"매크로 미리보기 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        // ==================== 헬퍼 함수들 ====================
+
+        /// <summary>
+        /// 현재 선택된 매크로 타입의 설정 객체를 반환하는 함수
+        /// </summary>
+        private IMacroActionSettings GetCurrentMacroSettings()
+        {
+            return _currentMacroType switch
+            {
+                MacroActionType.Combo => _comboSettings,
+                MacroActionType.Rapid => _rapidSettings,
+                MacroActionType.Hold => _holdSettings,
+                MacroActionType.Toggle => _toggleSettings,
+                MacroActionType.Repeat => _repeatSettings,
+                _ => _comboSettings
+            };
+        }
+
+        /// <summary>
+        /// 현재 설정에서 키 시퀀스 문자열을 생성하는 함수
+        /// </summary>
+        private string GetKeySequenceFromCurrentSettings()
+        {
+            return _currentMacroType switch
+            {
+                MacroActionType.Combo => string.Join(" -> ", _comboSteps.Select(s => s.KeySequence)),
+                MacroActionType.Rapid => RapidKeySequenceTextBox?.Text ?? "",
+                MacroActionType.Hold => HoldKeySequenceTextBox?.Text ?? "",
+                MacroActionType.Toggle => ToggleKeySequenceTextBox?.Text ?? "",
+                MacroActionType.Repeat => RepeatKeySequenceTextBox?.Text ?? "",
+                _ => ""
+            };
+        }
+
+        /// <summary>
+        /// 매크로 설정을 초기화하는 함수
+        /// </summary>
+        private void ClearMacroSettings()
+        {
+            try
+            {
+                // 기본 정보 초기화
+                if (MacroNameTextBox != null) MacroNameTextBox.Text = "";
+                if (VoiceCommandTextBox != null) VoiceCommandTextBox.Text = "";
+                if (MacroDescriptionTextBox != null) MacroDescriptionTextBox.Text = "";
+
+                // 콤보 설정 초기화
+                _comboSteps.Clear();
+                _comboSettings = new ComboActionSettings();
+
+                // 연사 설정 초기화
+                _rapidSettings = new RapidActionSettings();
+                if (RapidKeySequenceTextBox != null) RapidKeySequenceTextBox.Text = "";
+
+                // 홀드 설정 초기화
+                _holdSettings = new HoldActionSettings();
+                if (HoldKeySequenceTextBox != null) HoldKeySequenceTextBox.Text = "";
+                if (HoldReleaseCommandTextBox != null) HoldReleaseCommandTextBox.Text = "";
+
+                // 토글 설정 초기화
+                _toggleSettings = new ToggleActionSettings();
+                if (ToggleKeySequenceTextBox != null) ToggleKeySequenceTextBox.Text = "";
+                if (ToggleOffCommandTextBox != null) ToggleOffCommandTextBox.Text = "";
+                UpdateToggleStatusUI();
+
+                // 반복 설정 초기화
+                _repeatSettings = new RepeatActionSettings();
+                if (RepeatKeySequenceTextBox != null) RepeatKeySequenceTextBox.Text = "";
+
+                // 콤보 타입으로 초기화
+                if (ComboRadioButton != null) ComboRadioButton.IsChecked = true;
+                _currentMacroType = MacroActionType.Combo;
+                ShowMacroSettingsPanel(MacroActionType.Combo);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 설정 초기화 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 미리보기 텍스트를 생성하는 함수
+        /// </summary>
+        private string GenerateMacroPreviewText(IMacroActionSettings settings)
+        {
+            var preview = $"매크로 이름: {MacroNameTextBox?.Text ?? "미입력"}\n";
+            preview += $"음성 명령어: {VoiceCommandTextBox?.Text ?? "미입력"}\n";
+            preview += $"매크로 타입: {_currentMacroType}\n\n";
+
+            switch (_currentMacroType)
+            {
+                case MacroActionType.Combo:
+                    preview += "=== 콤보 설정 ===\n";
+                    preview += $"기본 딜레이: {_comboSettings.DefaultDelayMs}ms\n";
+                    preview += $"단계 수: {_comboSteps.Count}개\n";
+                    for (int i = 0; i < _comboSteps.Count; i++)
+                    {
+                        var step = _comboSteps[i];
+                        preview += $"  {i + 1}. {step.KeySequence} (딜레이: {step.DelayAfterMs}ms)\n";
+                    }
+                    break;
+
+                case MacroActionType.Rapid:
+                    preview += "=== 연사 설정 ===\n";
+                    preview += $"키: {RapidKeySequenceTextBox?.Text ?? "미입력"}\n";
+                    preview += $"속도: {_rapidSettings.ClicksPerSecond} CPS\n";
+                    preview += $"지속시간: {_rapidSettings.DurationSeconds}초\n";
+                    break;
+
+                case MacroActionType.Hold:
+                    preview += "=== 홀드 설정 ===\n";
+                    preview += $"키: {HoldKeySequenceTextBox?.Text ?? "미입력"}\n";
+                    preview += $"지속시간: {_holdSettings.HoldDurationSeconds}초\n";
+                    preview += $"고정 지속시간: {(_holdSettings.UseFixedDuration ? "예" : "아니오")}\n";
+                    if (!_holdSettings.UseFixedDuration)
+                    {
+                        preview += $"해제 명령어: {HoldReleaseCommandTextBox?.Text ?? "미입력"}\n";
+                    }
+                    break;
+
+                case MacroActionType.Toggle:
+                    preview += "=== 토글 설정 ===\n";
+                    preview += $"키: {ToggleKeySequenceTextBox?.Text ?? "미입력"}\n";
+                    preview += $"해제 명령어: {ToggleOffCommandTextBox?.Text ?? "동일 명령어"}\n";
+                    preview += $"상태 표시: {(_toggleSettings.ShowStatusIndicator ? "사용" : "사용 안함")}\n";
+                    break;
+
+                case MacroActionType.Repeat:
+                    preview += "=== 반복 설정 ===\n";
+                    preview += $"키: {RepeatKeySequenceTextBox?.Text ?? "미입력"}\n";
+                    preview += $"횟수: {_repeatSettings.RepeatCount}회\n";
+                    preview += $"간격: {_repeatSettings.IntervalSeconds}초\n";
+                    preview += $"다음 명령 시 중단: {(_repeatSettings.StopOnNextCommand ? "예" : "아니오")}\n";
+                    break;
+            }
+
+            return preview;
         }
     }
 } 
