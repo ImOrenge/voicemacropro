@@ -218,14 +218,192 @@
                 </Grid>
             </TabItem>
             
-            <!-- 향후 추가될 다른 탭들 -->
-            <TabItem Header="🎤 음성 인식" FontSize="14" Padding="15,10">
-                <Grid>
-                    <TextBlock Text="음성 인식 기능 (추후 구현 예정)" 
-                              HorizontalAlignment="Center" 
-                              VerticalAlignment="Center" 
-                              FontSize="16" 
-                              Foreground="#7F8C8D"/>
+            <!-- PRD 3.5 로그 및 모니터링 시스템 -->
+            <TabItem Header="📊 로그 및 모니터링" FontSize="14" Padding="15,10">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 로그 제어 패널 -->
+                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 로그 레벨 선택 -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="로그 레벨:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox Name="LogLevelComboBox" 
+                                         Width="100" 
+                                         Height="30"
+                                         SelectedIndex="1"
+                                         SelectionChanged="LogLevelComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Debug" Tag="Debug"/>
+                                    <ComboBoxItem Content="Info" Tag="Info"/>
+                                    <ComboBoxItem Content="Warning" Tag="Warning"/>
+                                    <ComboBoxItem Content="Error" Tag="Error"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <!-- 필터 검색박스 -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,20,0">
+                                <TextBlock Text="필터:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox Name="LogFilterTextBox" 
+                                        Width="200" 
+                                        Height="30" 
+                                        VerticalContentAlignment="Center"
+                                        FontSize="14"
+                                        TextChanged="LogFilterTextBox_TextChanged"/>
+                            </StackPanel>
+                            
+                            <!-- 자동 스크롤 체크박스 -->
+                            <CheckBox Grid.Column="2" 
+                                     Name="AutoScrollCheckBox"
+                                     Content="자동 스크롤" 
+                                     VerticalAlignment="Center"
+                                     IsChecked="True"
+                                     Checked="AutoScrollCheckBox_Checked"
+                                     Unchecked="AutoScrollCheckBox_Unchecked"/>
+                            
+                            <!-- 로그 관리 버튼들 -->
+                            <Button Grid.Column="3" 
+                                   Name="ExportLogButton"
+                                   Content="📁 로그 저장" 
+                                   Margin="10,0,0,0" 
+                                   Padding="15,5" 
+                                   Background="#17A2B8" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   Click="ExportLogButton_Click"/>
+                            
+                            <Button Grid.Column="4" 
+                                   Name="ClearLogButton"
+                                   Content="🗑️ 로그 지우기" 
+                                   Margin="10,0,0,0" 
+                                   Padding="15,5" 
+                                   Background="#DC3545" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   Click="ClearLogButton_Click"/>
+                            
+                            <!-- 로그 통계 -->
+                            <TextBlock Grid.Column="5" 
+                                      Name="LogCountTextBlock"
+                                      Text="총 0개 로그" 
+                                      VerticalAlignment="Center" 
+                                      Margin="20,0,0,0"
+                                      FontWeight="Bold"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 실시간 로그 출력창 -->
+                    <Border Grid.Row="1" Background="White" CornerRadius="5">
+                        <DataGrid Name="LogDataGrid" 
+                                 AutoGenerateColumns="False"
+                                 CanUserAddRows="False"
+                                 CanUserDeleteRows="False"
+                                 CanUserResizeRows="False"
+                                 SelectionMode="Single"
+                                 GridLinesVisibility="Horizontal"
+                                 HeadersVisibility="Column"
+                                 AlternatingRowBackground="#F8F9FA"
+                                 RowBackground="White"
+                                 BorderThickness="0"
+                                 FontSize="11"
+                                 FontFamily="Consolas, Monaco, 'Courier New', monospace">
+                            
+                            <!-- 로그 컬럼 정의 -->
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="시간" 
+                                                   Binding="{Binding TimeText}" 
+                                                   Width="100" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="레벨" 
+                                                   Binding="{Binding LevelText}" 
+                                                   Width="80" 
+                                                   IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{Binding LevelColor}"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="메시지" 
+                                                   Binding="{Binding Message}" 
+                                                   Width="*" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="매크로 ID" 
+                                                   Binding="{Binding MacroId}" 
+                                                   Width="80" 
+                                                   IsReadOnly="True"/>
+                            </DataGrid.Columns>
+                            
+                            <!-- 로그 행 스타일 -->
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="Height" Value="25"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#E3F2FD"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#2196F3"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            
+                            <!-- 로그 헤더 스타일 -->
+                            <DataGrid.ColumnHeaderStyle>
+                                <Style TargetType="DataGridColumnHeader">
+                                    <Setter Property="Background" Value="#37474F"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Padding" Value="8,6"/>
+                                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                                    <Setter Property="BorderBrush" Value="#263238"/>
+                                </Style>
+                            </DataGrid.ColumnHeaderStyle>
+                        </DataGrid>
+                    </Border>
+                    
+                    <!-- 하단 통계 패널 -->
+                    <Border Grid.Row="2" Background="White" Padding="15" Margin="0,10,0,0" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 성능 통계 표시 (향후 구현) -->
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="매크로 실행 성공률" FontWeight="Bold" Margin="0,0,0,5"/>
+                                <TextBlock Name="MacroSuccessRateTextBlock" Text="100%" FontSize="24" Foreground="#4CAF50"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="음성 인식 정확도" FontWeight="Bold" Margin="0,0,0,5"/>
+                                <TextBlock Name="VoiceAccuracyTextBlock" Text="95%" FontSize="24" Foreground="#2196F3"/>
+                            </StackPanel>
+                            
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="시스템 상태" FontWeight="Bold" Margin="0,0,0,5"/>
+                                <TextBlock Name="SystemStatusTextBlock" Text="정상" FontSize="24" Foreground="#4CAF50"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
             </TabItem>
             
