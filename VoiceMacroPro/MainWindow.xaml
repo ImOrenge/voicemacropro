@@ -1680,6 +1680,308 @@
                 </Grid>
             </TabItem>
             
+            <!-- 개발자 정보 탭 -->
+            <TabItem Header="💻 개발자 정보" FontSize="14" Padding="15,10">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- 프로그램 정보 섹션 -->
+                        <Border Grid.Row="0" Background="White" Padding="25" Margin="0,0,0,20" CornerRadius="10" 
+                               BorderThickness="1" BorderBrush="#E1E8ED">
+                            <StackPanel>
+                                <TextBlock Text="🎮 VoiceMacro Pro" 
+                                          FontSize="32" 
+                                          FontWeight="Bold" 
+                                          Foreground="#2C3E50" 
+                                          HorizontalAlignment="Center"
+                                          Margin="0,0,0,10"/>
+                                
+                                <TextBlock Text="게임 AI 음성 매크로 프로그램" 
+                                          FontSize="18" 
+                                          Foreground="#7F8C8D" 
+                                          HorizontalAlignment="Center"
+                                          Margin="0,0,0,15"/>
+                                
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="버전: " FontWeight="Bold" Foreground="#34495E"/>
+                                    <TextBlock Text="1.0.0" Foreground="#3498DB" FontWeight="Bold"/>
+                                    <TextBlock Text=" | " Margin="10,0" Foreground="#BDC3C7"/>
+                                    <TextBlock Text="빌드: " FontWeight="Bold" Foreground="#34495E"/>
+                                    <TextBlock Text="2025.01.17" Foreground="#E67E22" FontWeight="Bold"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- 카피라이트 정보 -->
+                        <Border Grid.Row="1" Background="#F8F9FA" Padding="20" Margin="0,0,0,20" CornerRadius="8">
+                            <StackPanel>
+                                <TextBlock Text="📄 저작권 정보" 
+                                          FontSize="18" 
+                                          FontWeight="Bold" 
+                                          Foreground="#2C3E50" 
+                                          Margin="0,0,0,15"/>
+                                
+                                <TextBlock Text="© 2025 VoiceMacro Pro Development Team. All Rights Reserved." 
+                                          FontSize="14" 
+                                          Foreground="#34495E"
+                                          Margin="0,0,0,8"/>
+                                
+                                <TextBlock Text="본 소프트웨어는 저작권법에 의해 보호받습니다." 
+                                          FontSize="12" 
+                                          Foreground="#7F8C8D"
+                                          Margin="0,0,0,5"/>
+                                
+                                <TextBlock Text="무단 복제, 배포, 수정을 금지합니다." 
+                                          FontSize="12" 
+                                          Foreground="#7F8C8D"/>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- 기술 스택 정보 -->
+                        <Border Grid.Row="2" Background="White" Padding="20" Margin="0,0,0,20" CornerRadius="8"
+                               BorderThickness="1" BorderBrush="#E1E8ED">
+                            <StackPanel>
+                                <TextBlock Text="🛠️ 기술 스택" 
+                                          FontSize="18" 
+                                          FontWeight="Bold" 
+                                          Foreground="#2C3E50" 
+                                          Margin="0,0,0,15"/>
+                                
+                                <!-- 프론트엔드 기술 -->
+                                <StackPanel Margin="0,0,0,15">
+                                    <TextBlock Text="💻 프론트엔드" FontWeight="Bold" FontSize="14" Foreground="#3498DB" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <Border Grid.Column="0" Background="#F0F8FF" Padding="10" Margin="0,0,5,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="⚡" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="C# WPF" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text=".NET 6.0" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Border Grid.Column="1" Background="#FFF5F5" Padding="10" Margin="2.5,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🎨" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="XAML" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="UI Layout" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Border Grid.Column="2" Background="#F0FFF0" Padding="10" Margin="5,0,0,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🔗" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="HTTP API" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="REST Client" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                                
+                                <!-- 백엔드 기술 -->
+                                <StackPanel Margin="0,0,0,15">
+                                    <TextBlock Text="🐍 백엔드" FontWeight="Bold" FontSize="14" Foreground="#E74C3C" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <Border Grid.Column="0" Background="#FFF8DC" Padding="10" Margin="0,0,5,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🐍" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Python" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="3.9+" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Border Grid.Column="1" Background="#F0F8FF" Padding="10" Margin="2.5,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🌐" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Flask" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="API Server" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Border Grid.Column="2" Background="#FFF0F5" Padding="10" Margin="5,0,0,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🤖" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="PyAutoGUI" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Automation" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                                
+                                <!-- AI & 데이터베이스 -->
+                                <StackPanel>
+                                    <TextBlock Text="🧠 AI &amp; 데이터베이스" FontWeight="Bold" FontSize="14" Foreground="#9B59B6" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <Border Grid.Column="0" Background="#F5F0FF" Padding="10" Margin="0,0,5,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🎙️" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Whisper AI" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="OpenAI" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Border Grid.Column="1" Background="#F8F8FF" Padding="10" Margin="2.5,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="🗄️" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="SQLite" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Database" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        
+                                        <Border Grid.Column="2" Background="#FFF8F0" Padding="10" Margin="5,0,0,0" CornerRadius="5">
+                                            <StackPanel HorizontalAlignment="Center">
+                                                <TextBlock Text="📊" FontSize="24" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="JSON" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Data Format" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- 개발팀 정보 -->
+                        <Border Grid.Row="3" Background="#F8F9FA" Padding="20" Margin="0,0,0,20" CornerRadius="8">
+                            <StackPanel>
+                                <TextBlock Text="👥 개발팀 정보" 
+                                          FontSize="18" 
+                                          FontWeight="Bold" 
+                                          Foreground="#2C3E50" 
+                                          Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- 개발자 정보 -->
+                                    <StackPanel Grid.Column="0" Margin="0,0,15,0">
+                                        <Border Background="White" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="#E1E8ED">
+                                            <StackPanel>
+                                                <TextBlock Text="💻 Lead Developer" FontWeight="Bold" FontSize="14" Foreground="#3498DB" Margin="0,0,0,8"/>
+                                                <TextBlock Text="Senior Software Engineer" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                                                <TextBlock Text="전문 분야: AI/ML, Game Development" FontSize="11" Foreground="#34495E" Margin="0,0,0,5"/>
+                                                <TextBlock Text="경력: 5+ years" FontSize="11" Foreground="#34495E"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    
+                                    <!-- 프로젝트 정보 -->
+                                    <StackPanel Grid.Column="1">
+                                        <Border Background="White" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="#E1E8ED">
+                                            <StackPanel>
+                                                <TextBlock Text="📊 프로젝트 통계" FontWeight="Bold" FontSize="14" Foreground="#E74C3C" Margin="0,0,0,8"/>
+                                                <TextBlock Text="개발 기간: 2024.12 ~ 2025.01" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                                                <TextBlock Text="코드 라인: 3,000+ lines" FontSize="11" Foreground="#34495E" Margin="0,0,0,5"/>
+                                                <TextBlock Text="구현 기능: 5개 주요 모듈" FontSize="11" Foreground="#34495E"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- 특별 감사 -->
+                        <Border Grid.Row="4" Background="White" Padding="20" Margin="0,0,0,20" CornerRadius="8"
+                               BorderThickness="1" BorderBrush="#E1E8ED">
+                            <StackPanel>
+                                <TextBlock Text="🙏 Special Thanks" 
+                                          FontSize="18" 
+                                          FontWeight="Bold" 
+                                          Foreground="#2C3E50" 
+                                          Margin="0,0,0,15"/>
+                                
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                        <TextBlock Text="🤖 OpenAI" FontWeight="Bold" FontSize="14" Foreground="#00A67C" Margin="0,0,0,5"/>
+                                        <TextBlock Text="Whisper AI 음성 인식 모델 제공" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    
+                                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                                        <TextBlock Text="🐍 Python Community" FontWeight="Bold" FontSize="14" Foreground="#3776AB" Margin="0,0,0,5"/>
+                                        <TextBlock Text="강력한 오픈소스 라이브러리 생태계" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="🎮 Gaming Community" FontWeight="Bold" FontSize="14" Foreground="#FF6B35" Margin="0,0,0,5"/>
+                                        <TextBlock Text="테스트 및 피드백 제공" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        
+                        <!-- 라이선스 및 법적 고지 -->
+                        <Border Grid.Row="5" Background="#2C3E50" Padding="20" CornerRadius="8">
+                            <StackPanel>
+                                <TextBlock Text="⚖️ 라이선스 및 법적 고지" 
+                                          FontSize="16" 
+                                          FontWeight="Bold" 
+                                          Foreground="White" 
+                                          Margin="0,0,0,15"/>
+                                
+                                <TextBlock Text="• 본 소프트웨어는 교육 및 개인 사용 목적으로 제공됩니다." 
+                                          FontSize="12" 
+                                          Foreground="#BDC3C7" 
+                                          Margin="0,0,0,5"/>
+                                
+                                <TextBlock Text="• 상업적 사용 시 별도 라이선스가 필요합니다." 
+                                          FontSize="12" 
+                                          Foreground="#BDC3C7" 
+                                          Margin="0,0,0,5"/>
+                                
+                                <TextBlock Text="• 게임 이용약관 및 관련 법규를 준수하여 사용하시기 바랍니다." 
+                                          FontSize="12" 
+                                          Foreground="#BDC3C7" 
+                                          Margin="0,0,0,5"/>
+                                
+                                <TextBlock Text="• 사용자의 부적절한 사용으로 인한 책임은 사용자에게 있습니다." 
+                                          FontSize="12" 
+                                          Foreground="#BDC3C7" 
+                                          Margin="0,0,0,10"/>
+                                
+                                <TextBlock Text="📧 Contact: voicemacro.pro@example.com" 
+                                          FontSize="12" 
+                                          Foreground="#3498DB" 
+                                          FontWeight="Bold"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
 
         </TabControl>
         
