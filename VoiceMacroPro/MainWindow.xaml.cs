@@ -1062,7 +1062,7 @@ namespace VoiceMacroPro
         }
 
         /// <summary>
-        /// 음성을 분석하고 매크로 매칭 결과를 표시
+        /// 음성을 분석하고 매크로 매칭 결과를 표시 (OpenAI Whisper 사용)
         /// </summary>
         private async Task AnalyzeVoiceAndShowResults()
         {
@@ -1070,52 +1070,150 @@ namespace VoiceMacroPro
             {
                 if (RecognizedTextBlock != null)
                 {
-                    RecognizedTextBlock.Text = "음성을 분석 중입니다...";
+                    RecognizedTextBlock.Text = "🤖 Whisper AI로 음성을 분석 중...";
                     RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Orange);
                 }
                 
-                var matchResults = await _voiceService.AnalyzeVoiceAndMatchMacrosAsync(2.0);
+                _loggingService.LogInfo("Whisper AI 음성 분석 시작");
                 
-                if (matchResults.Count > 0)
+                // OpenAI Whisper API를 사용하여 음성 명령 처리
+                var result = await _apiService.RecordAndProcessVoiceAsync(3.0); // 3초간 녹음 후 처리
+                
+                if (result != null && !string.IsNullOrEmpty(result.RecognizedText))
                 {
-                    _currentMatchResults.Clear();
-                    _currentMatchResults.AddRange(matchResults);
+                    // 인식된 텍스트 표시
+                    if (RecognizedTextBlock != null)
+                    {
+                        RecognizedTextBlock.Text = $"🎯 인식됨: \"{result.RecognizedText}\"";
+                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Green);
+                    }
                     
-                    // DataGrid 새로고침
+                    // 매칭된 매크로가 있는 경우
+                    if (result.MatchedMacros != null && result.MatchedMacros.Count > 0)
+                    {
+                                                 // MacroMatch를 VoiceMatchResult로 변환
+                         _currentMatchResults.Clear();
+                         
+                         for (int i = 0; i < result.MatchedMacros.Count; i++)
+                         {
+                             var macro = result.MatchedMacros[i];
+                             var matchResult = new VoiceMatchResult
+                             {
+                                 Rank = i + 1,
+                                 MacroId = macro.MacroId,
+                                 MacroName = macro.MacroName,
+                                 VoiceCommand = macro.VoiceCommand,
+                                 ActionDescription = macro.ActionDescription,
+                                 Confidence = macro.Confidence / 100.0 // 백분율을 0.0-1.0 범위로 변환
+                             };
+                             _currentMatchResults.Add(matchResult);
+                         }
+                        
+                        // DataGrid 새로고침
+                        if (MatchedMacrosDataGrid != null)
+                        {
+                            MatchedMacrosDataGrid.Items.Refresh();
+                        }
+                        
+                        _loggingService.LogInfo($"✅ Whisper 음성 인식 성공! 텍스트: '{result.RecognizedText}', " +
+                                             $"매칭된 매크로: {result.MatchedMacros.Count}개, " +
+                                             $"처리 시간: {result.ProcessingTime:F2}초");
+                        
+                        // 가장 높은 확신도의 매크로가 90% 이상이면 자동 실행 옵션 제공
+                        if (result.MatchedMacros[0].Confidence >= 90)
+                        {
+                            var topMacro = result.MatchedMacros[0];
+                            var autoExecuteResult = MessageBox.Show(
+                                $"높은 확신도({topMacro.Confidence:F1}%)로 매크로를 찾았습니다!\n\n" +
+                                $"매크로: {topMacro.MacroName}\n" +
+                                $"명령어: {topMacro.VoiceCommand}\n" +
+                                $"동작: {topMacro.ActionDescription}\n\n" +
+                                $"지금 실행하시겠습니까?",
+                                "자동 실행 확인", 
+                                MessageBoxButton.YesNo, 
+                                MessageBoxImage.Question);
+                            
+                            if (autoExecuteResult == MessageBoxResult.Yes)
+                            {
+                                await ExecuteMacroById(topMacro.MacroId);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 음성은 인식되었지만 매칭되는 매크로가 없음
+                        _currentMatchResults.Clear();
+                        if (MatchedMacrosDataGrid != null)
+                        {
+                            MatchedMacrosDataGrid.Items.Refresh();
+                        }
+                        
+                        _loggingService.LogWarning($"⚠️ 음성 인식 성공하였으나 매칭되는 매크로가 없습니다. " +
+                                                 $"인식된 텍스트: '{result.RecognizedText}'");
+                        
+                        MessageBox.Show(
+                            $"음성이 \"{result.RecognizedText}\"로 인식되었지만,\n" +
+                            $"매칭되는 매크로가 없습니다.\n\n" +
+                            $"매크로 관리 탭에서 이 명령어로 새 매크로를 생성해보세요.",
+                            "매크로 없음", 
+                            MessageBoxButton.OK, 
+                            MessageBoxImage.Information);
+                    }
+                }
+                else
+                {
+                    // 음성 인식 실패
+                    if (RecognizedTextBlock != null)
+                    {
+                        RecognizedTextBlock.Text = "❌ 음성을 인식할 수 없습니다";
+                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                    }
+                    
+                    _currentMatchResults.Clear();
                     if (MatchedMacrosDataGrid != null)
                     {
                         MatchedMacrosDataGrid.Items.Refresh();
                     }
                     
-                    // 인식된 텍스트 표시 (첫 번째 결과의 음성 명령어 사용)
-                    if (RecognizedTextBlock != null && matchResults.Count > 0)
-                    {
-                        RecognizedTextBlock.Text = $"인식됨: \"{matchResults[0].VoiceCommand}\"";
-                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Green);
-                    }
+                    _loggingService.LogWarning("❌ Whisper 음성 인식 실패 - 명확한 음성이나 소음이 없음");
                     
-                    _loggingService.LogInfo($"매크로 매칭 완료: {matchResults.Count}개 결과");
-                }
-                else
-                {
-                    if (RecognizedTextBlock != null)
-                    {
-                        RecognizedTextBlock.Text = "매칭되는 매크로가 없습니다.";
-                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
-                    }
-                    
-                    _loggingService.LogWarning("매크로 매칭 결과가 없습니다.");
+                    MessageBox.Show(
+                        "음성을 인식할 수 없습니다.\n\n" +
+                        "다음을 확인해주세요:\n" +
+                        "• 마이크가 올바르게 연결되어 있는지\n" +
+                        "• 주변 소음이 너무 크지 않은지\n" +
+                        "• 명령어를 명확하게 발음했는지\n" +
+                        "• OpenAI API 키가 설정되어 있는지",
+                        "음성 인식 실패", 
+                        MessageBoxButton.OK, 
+                        MessageBoxImage.Warning);
                 }
             }
             catch (Exception ex)
             {
                 if (RecognizedTextBlock != null)
                 {
-                    RecognizedTextBlock.Text = "음성 분석 실패";
+                    RecognizedTextBlock.Text = "💥 음성 분석 오류 발생";
                     RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Red);
                 }
                 
-                _loggingService.LogError($"음성 분석 중 오류: {ex.Message}");
+                _currentMatchResults.Clear();
+                if (MatchedMacrosDataGrid != null)
+                {
+                    MatchedMacrosDataGrid.Items.Refresh();
+                }
+                
+                _loggingService.LogError($"💥 Whisper 음성 분석 중 오류: {ex.Message}");
+                
+                MessageBox.Show(
+                    $"음성 분석 중 오류가 발생했습니다:\n\n{ex.Message}\n\n" +
+                    $"다음을 확인해주세요:\n" +
+                    $"• 백엔드 서버가 실행 중인지 (Python API 서버)\n" +
+                    $"• OpenAI API 키가 올바르게 설정되어 있는지\n" +
+                    $"• 인터넷 연결이 정상인지",
+                    "오류", 
+                    MessageBoxButton.OK, 
+                    MessageBoxImage.Error);
             }
         }
 

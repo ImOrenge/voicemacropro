@@ -64,49 +64,96 @@ namespace VoiceMacroPro.Models
         /// <summary>
         /// 매크로의 고유 ID (데이터베이스에서 자동 생성)
         /// </summary>
+        [JsonProperty("id")]
         public int Id { get; set; }
 
         /// <summary>
         /// 매크로 이름 (사용자가 지정)
         /// </summary>
+        [JsonProperty("name")]
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
         /// 음성 명령어 (사용자가 말하는 단어나 문장)
         /// </summary>
+        [JsonProperty("voice_command")]
         public string VoiceCommand { get; set; } = string.Empty;
 
         /// <summary>
         /// 동작 타입 (combo, rapid, hold, toggle, repeat)
         /// </summary>
+        [JsonProperty("action_type")]
         public string ActionType { get; set; } = string.Empty;
 
         /// <summary>
         /// 키 시퀀스 (실제로 실행될 키보드/마우스 동작)
         /// </summary>
+        [JsonProperty("key_sequence")]
         public string KeySequence { get; set; } = string.Empty;
 
         /// <summary>
         /// 추가 설정 정보 (딕셔너리 형태)
         /// 백엔드에서 JSON 문자열로 전송될 수 있어 커스텀 컨버터 사용
         /// </summary>
+        [JsonProperty("settings")]
         [JsonConverter(typeof(SettingsJsonConverter))]
         public Dictionary<string, object> Settings { get; set; } = new Dictionary<string, object>();
 
         /// <summary>
-        /// 생성 날짜 및 시간
+        /// 생성 날짜 및 시간 (백엔드에서 문자열로 전송됨)
         /// </summary>
-        public DateTime CreatedAt { get; set; }
+        [JsonProperty("created_at")]
+        public string CreatedAtString { get; set; } = string.Empty;
 
         /// <summary>
-        /// 마지막 수정 날짜 및 시간
+        /// 마지막 수정 날짜 및 시간 (백엔드에서 문자열로 전송됨)
         /// </summary>
-        public DateTime UpdatedAt { get; set; }
+        [JsonProperty("updated_at")]
+        public string UpdatedAtString { get; set; } = string.Empty;
 
         /// <summary>
         /// 사용 횟수 (매크로가 실행된 총 횟수)
         /// </summary>
+        [JsonProperty("usage_count")]
         public int UsageCount { get; set; }
+
+        /// <summary>
+        /// 생성 날짜를 DateTime으로 변환하여 반환하는 속성
+        /// JSON 직렬화에서는 제외됩니다.
+        /// </summary>
+        [JsonIgnore]
+        public DateTime CreatedAt 
+        { 
+            get 
+            { 
+                if (DateTime.TryParse(CreatedAtString, out DateTime result))
+                    return result;
+                return DateTime.MinValue;
+            }
+            set
+            {
+                CreatedAtString = value.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+        }
+
+        /// <summary>
+        /// 수정 날짜를 DateTime으로 변환하여 반환하는 속성
+        /// JSON 직렬화에서는 제외됩니다.
+        /// </summary>
+        [JsonIgnore]
+        public DateTime UpdatedAt 
+        { 
+            get 
+            { 
+                if (DateTime.TryParse(UpdatedAtString, out DateTime result))
+                    return result;
+                return DateTime.MinValue;
+            }
+            set
+            {
+                UpdatedAtString = value.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+        }
 
         /// <summary>
         /// 기본 생성자
@@ -114,8 +161,9 @@ namespace VoiceMacroPro.Models
         /// </summary>
         public Macro()
         {
-            CreatedAt = DateTime.Now;
-            UpdatedAt = DateTime.Now;
+            var now = DateTime.Now;
+            CreatedAt = now;
+            UpdatedAt = now;
         }
 
         /// <summary>
@@ -132,8 +180,9 @@ namespace VoiceMacroPro.Models
             VoiceCommand = voiceCommand;
             ActionType = actionType;
             KeySequence = keySequence;
-            CreatedAt = DateTime.Now;
-            UpdatedAt = DateTime.Now;
+            var now = DateTime.Now;
+            CreatedAt = now;
+            UpdatedAt = now;
         }
 
         /// <summary>

@@ -3,7 +3,12 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from macro_service import macro_service
 from voice_recognition_service_basic import get_voice_recognition_service_basic
+from whisper_service import whisper_service
+from voice_recognition_service import get_voice_recognition_service
+from macro_execution_service import macro_execution_service
 import json
+import numpy as np
+import base64
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__)
@@ -274,6 +279,92 @@ def increment_usage(macro_id):
             'message': '사용 횟수 업데이트 실패'
         }), 500
 
+# ========== 매크로 실행 관련 API 엔드포인트 ==========
+
+@app.route('/api/macros/<int:macro_id>/execute', methods=['POST'])
+def execute_macro(macro_id):
+    """
+    매크로를 실제로 실행하는 API 엔드포인트
+    
+    Args:
+        macro_id (int): 실행할 매크로 ID
+        
+    Returns:
+        JSON: 실행 결과
+    """
+    try:
+        result = macro_execution_service.execute_macro(macro_id)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'execution_time': result['execution_time'],
+                    'message': result['message']
+                },
+                'message': '매크로 실행 성공'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '매크로 실행 실패'),
+                'message': '매크로 실행 실패'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '매크로 실행 중 오류 발생'
+        }), 500
+
+@app.route('/api/macros/execution/stop-all', methods=['POST'])
+def stop_all_macros():
+    """
+    모든 토글 매크로를 중지하는 API 엔드포인트 (비상 정지)
+    
+    Returns:
+        JSON: 중지 결과
+    """
+    try:
+        macro_execution_service.stop_all_toggle_macros()
+        
+        return jsonify({
+            'success': True,
+            'message': '모든 토글 매크로가 중지되었습니다'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '매크로 중지 실패'
+        }), 500
+
+@app.route('/api/macros/execution/status', methods=['GET'])
+def get_execution_status():
+    """
+    매크로 실행 상태를 조회하는 API 엔드포인트
+    
+    Returns:
+        JSON: 실행 상태 정보
+    """
+    try:
+        status = macro_execution_service.get_execution_status()
+        
+        return jsonify({
+            'success': True,
+            'data': status,
+            'message': '매크로 실행 상태 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '매크로 실행 상태 조회 실패'
+        }), 500
+
 # ========== 음성 인식 관련 API 엔드포인트==========
 
 @app.route('/api/voice/devices', methods=['GET'])
@@ -451,6 +542,241 @@ def test_microphone():
             'success': False,
             'error': str(e),
             'message': '마이크 테스트 수행 실패'
+        }), 500
+
+# ==================== OpenAI Whisper 관련 API ====================
+
+@app.route('/api/whisper/transcribe', methods=['POST'])
+def whisper_transcribe():
+    """
+    오디오 데이터를 OpenAI Whisper API로 텍스트 변환하는 엔드포인트
+    
+    요청 본문:
+        audio_data (str): Base64 인코딩된 오디오 데이터 (numpy array)
+        
+    Returns:
+        JSON: 변환된 텍스트 결과
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'audio_data' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'audio_data가 필요합니다'
+            }), 400
+        
+        # Base64 디코딩하여 numpy 배열로 변환
+        try:
+            audio_bytes = base64.b64decode(data['audio_data'])
+            audio_array = np.frombuffer(audio_bytes, dtype=np.float32)
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'오디오 데이터 디코딩 실패: {str(e)}'
+            }), 400
+        
+        # Whisper API로 텍스트 변환
+        recognized_text = whisper_service.transcribe_audio(audio_array)
+        
+        if recognized_text:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'recognized_text': recognized_text
+                },
+                'message': '음성 인식 성공'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '음성 인식에 실패했습니다'
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '음성 인식 처리 실패'
+        }), 500
+
+@app.route('/api/whisper/process', methods=['POST'])
+def whisper_process_voice_command():
+    """
+    음성 명령 전체 처리 파이프라인 (음성 인식 + 매크로 매칭)
+    
+    요청 본문:
+        audio_data (str): Base64 인코딩된 오디오 데이터
+        
+    Returns:
+        JSON: 음성 인식 결과 및 매칭된 매크로 목록
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'audio_data' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'audio_data가 필요합니다'
+            }), 400
+        
+        # Base64 디코딩하여 numpy 배열로 변환
+        try:
+            audio_bytes = base64.b64decode(data['audio_data'])
+            audio_array = np.frombuffer(audio_bytes, dtype=np.float32)
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'message': f'오디오 데이터 디코딩 실패: {str(e)}'
+            }), 400
+        
+        # 전체 음성 명령 처리 파이프라인 실행
+        result = whisper_service.process_voice_command(audio_array)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'recognized_text': result['recognized_text'],
+                    'matched_macros': result['matched_macros'],
+                    'processing_time': result['processing_time']
+                },
+                'message': '음성 명령 처리 성공'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': result.get('error', '음성 명령 처리 실패')
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '음성 명령 처리 실패'
+        }), 500
+
+@app.route('/api/whisper/match', methods=['POST'])
+def whisper_match_macros():
+    """
+    텍스트와 매크로 명령어 매칭
+    
+    요청 본문:
+        text (str): 매칭할 텍스트
+        
+    Returns:
+        JSON: 매칭된 매크로 목록
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'text' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'text가 필요합니다'
+            }), 400
+        
+        text = data['text'].strip()
+        if not text:
+            return jsonify({
+                'success': False,
+                'message': '빈 텍스트는 처리할 수 없습니다'
+            }), 400
+        
+        # 매크로 매칭 수행
+        matched_macros = whisper_service.find_matching_macros(text)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'input_text': text,
+                'matched_macros': matched_macros,
+                'match_count': len(matched_macros)
+            },
+            'message': f'매크로 매칭 완료: {len(matched_macros)}개 발견'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '매크로 매칭 실패'
+        }), 500
+
+@app.route('/api/whisper/status', methods=['GET'])
+def whisper_status():
+    """
+    Whisper 서비스 상태 조회
+    
+    Returns:
+        JSON: Whisper 서비스 상태 정보
+    """
+    try:
+        status = whisper_service.get_service_status()
+        
+        return jsonify({
+            'success': True,
+            'data': status,
+            'message': 'Whisper 서비스 상태 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Whisper 서비스 상태 조회 실패'
+        }), 500
+
+@app.route('/api/voice/record-and-process', methods=['POST'])
+def record_and_process_voice():
+    """
+    실시간 녹음된 오디오를 가져와서 Whisper로 처리
+    
+    요청 본문:
+        duration (float): 녹음할 시간(초) - 기본값 3.0초
+        
+    Returns:
+        JSON: 음성 인식 및 매크로 매칭 결과
+    """
+    try:
+        data = request.get_json()
+        duration = data.get('duration', 3.0) if data else 3.0
+        
+        # 음성 인식 서비스에서 오디오 데이터 가져오기
+        voice_service = get_voice_recognition_service()
+        audio_data = voice_service.get_audio_data(duration)
+        
+        if audio_data is None:
+            return jsonify({
+                'success': False,
+                'message': '녹음된 오디오 데이터가 없습니다. 먼저 녹음을 시작해주세요.'
+            }), 400
+        
+        # Whisper로 전체 처리 파이프라인 실행
+        result = whisper_service.process_voice_command(audio_data)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'recognized_text': result['recognized_text'],
+                    'matched_macros': result['matched_macros'],
+                    'processing_time': result['processing_time'],
+                    'audio_duration': duration
+                },
+                'message': '음성 명령 처리 성공'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': result.get('error', '음성 명령 처리 실패')
+            }), 400
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '음성 녹음 및 처리 실패'
         }), 500
 
 @app.route('/api/health', methods=['GET'])
