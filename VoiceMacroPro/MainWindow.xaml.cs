@@ -12,6 +12,7 @@ using VoiceMacroPro.Models;
 using VoiceMacroPro.Services;
 using VoiceMacroPro.Views;
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace VoiceMacroPro
 {
@@ -113,6 +114,10 @@ namespace VoiceMacroPro
                 // 매크로 목록 로드
                 await LoadMacros();
                 System.Diagnostics.Debug.WriteLine("매크로 로드 완료");
+                
+                // 프리셋 목록 로드
+                await LoadPresets();
+                System.Diagnostics.Debug.WriteLine("프리셋 로드 완료");
                 
                 // 음성 인식 UI 초기화 (UI 요소들이 모두 로드된 후)
                 InitializeVoiceRecognitionUI();
@@ -2322,6 +2327,676 @@ namespace VoiceMacroPro
             }
 
             return preview;
+        }
+
+        // ==================== 프리셋 관리 관련 필드 및 메서드 ====================
+        private List<PresetModel> _allPresets = new List<PresetModel>();
+        private PresetModel? _selectedPreset = null;
+        private string _currentPresetSearchTerm = string.Empty;
+        private bool _favoritesOnly = false;
+
+        /// <summary>
+        /// 프리셋 목록을 서버에서 불러와 DataGrid에 표시하는 함수
+        /// </summary>
+        private async Task LoadPresets()
+        {
+            try
+            {
+                UpdateStatusText("프리셋 목록 로딩 중...");
+
+                // API를 통해 프리셋 목록 조회
+                _allPresets = await _apiService.GetPresetsAsync(_currentPresetSearchTerm, _favoritesOnly);
+
+                // DataGrid에 바인딩
+                if (PresetDataGrid != null)
+                {
+                    PresetDataGrid.ItemsSource = _allPresets;
+                }
+
+                // 통계 정보 업데이트
+                await UpdatePresetStatistics();
+
+                _loggingService.LogInfo($"프리셋 목록 로드 완료: {_allPresets.Count}개 항목");
+                UpdateStatusText($"프리셋 {_allPresets.Count}개 로드 완료");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"프리셋 목록을 불러오는 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("프리셋 로드 실패");
+                _loggingService.LogError("프리셋 목록 로드 실패", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 통계 정보를 업데이트하는 함수
+        /// </summary>
+        private async Task UpdatePresetStatistics()
+        {
+            try
+            {
+                var stats = await _apiService.GetPresetStatisticsAsync();
+                if (stats != null)
+                {
+                    // UI 요소들 업데이트
+                    if (TotalPresetsText != null)
+                        TotalPresetsText.Text = $"{stats.TotalPresets}개";
+
+                    if (FavoritePresetsText != null)
+                        FavoritePresetsText.Text = $"{stats.FavoritePresets}개";
+
+                    if (FavoritePercentageText != null)
+                        FavoritePercentageText.Text = stats.FavoritePercentageText;
+
+                    if (RecentPresetText != null)
+                    {
+                        RecentPresetText.Text = stats.MostRecentPreset?.Name ?? "없음";
+                    }
+
+                    if (PresetCountTextBlock != null)
+                        PresetCountTextBlock.Text = $"총 {stats.TotalPresets}개 프리셋";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError("프리셋 통계 업데이트 실패", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 검색 텍스트박스 변경 이벤트 핸들러
+        /// </summary>
+        private async void PresetSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // 검색어 변경 후 잠깐 대기 (연속 입력 방지)
+            if (sender is TextBox textBox)
+            {
+                _currentPresetSearchTerm = textBox.Text?.Trim() ?? string.Empty;
+                await Task.Delay(300); // 300ms 대기
+                
+                // 텍스트가 변경되지 않았으면 검색 실행
+                if (textBox.Text?.Trim() == _currentPresetSearchTerm)
+                {
+                    await LoadPresets();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 검색 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void PresetSearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            _currentPresetSearchTerm = PresetSearchTextBox?.Text?.Trim() ?? string.Empty;
+            await LoadPresets();
+        }
+
+        /// <summary>
+        /// 즐겨찾기 필터 체크박스 변경 이벤트 핸들러
+        /// </summary>
+        private async void FavoritesOnlyCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            _favoritesOnly = FavoritesOnlyCheckBox?.IsChecked == true;
+            await LoadPresets();
+        }
+
+        /// <summary>
+        /// 프리셋 새로고침 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void RefreshPresetsButton_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadPresets();
+        }
+
+        /// <summary>
+        /// 새 프리셋 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void NewPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            // 간단한 프리셋 생성 다이얼로그
+            string result = ShowInputDialog("새 프리셋", "새 프리셋 이름을 입력하세요:", "새 프리셋");
+            
+            if (!string.IsNullOrWhiteSpace(result))
+            {
+                try
+                {
+                    UpdateStatusText("새 프리셋 생성 중...");
+
+                    var request = new CreatePresetRequest
+                    {
+                        Name = result,
+                        Description = "새로 생성된 프리셋",
+                        MacroIds = new List<int>(), // 빈 프리셋으로 시작
+                        IsFavorite = false
+                    };
+
+                    var newPresetId = await _apiService.CreatePresetAsync(request);
+                    _loggingService.LogInfo($"새 프리셋이 생성되었습니다: '{request.Name}' (ID: {newPresetId})");
+
+                    await LoadPresets();
+                    UpdateStatusText("새 프리셋이 성공적으로 추가되었습니다.");
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogError("프리셋 추가 중 오류 발생", ex);
+                    MessageBox.Show($"프리셋 추가 중 오류가 발생했습니다:\n{ex.Message}",
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UpdateStatusText("프리셋 추가 실패");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 수정 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void EditPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset == null)
+            {
+                MessageBox.Show("수정할 프리셋을 선택해주세요.", "선택 오류",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // 간단한 프리셋 수정 다이얼로그
+            string result = ShowInputDialog("프리셋 수정", "프리셋 이름을 수정하세요:", _selectedPreset.Name);
+            
+            if (!string.IsNullOrWhiteSpace(result) && result != _selectedPreset.Name)
+            {
+                try
+                {
+                    UpdateStatusText("프리셋 수정 중...");
+
+                    var request = new UpdatePresetRequest
+                    {
+                        Name = result,
+                        Description = _selectedPreset.Description,
+                        MacroIds = _selectedPreset.MacroIds,
+                        IsFavorite = _selectedPreset.IsFavorite
+                    };
+
+                    await _apiService.UpdatePresetAsync(_selectedPreset.Id, request);
+                    _loggingService.LogInfo($"프리셋이 수정되었습니다: '{request.Name}' (ID: {_selectedPreset.Id})");
+
+                    await LoadPresets();
+                    UpdateStatusText("프리셋이 성공적으로 수정되었습니다.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"프리셋 수정 중 오류가 발생했습니다:\n{ex.Message}",
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UpdateStatusText("프리셋 수정 실패");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 복사 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void CopyPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset == null)
+            {
+                MessageBox.Show("복사할 프리셋을 선택해주세요.", "선택 오류",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                UpdateStatusText("프리셋 복사 중...");
+
+                string newName = $"{_selectedPreset.Name} - 복사본";
+                var newPresetId = await _apiService.CopyPresetAsync(_selectedPreset.Id, newName);
+
+                await LoadPresets();
+                UpdateStatusText("프리셋이 성공적으로 복사되었습니다.");
+                _loggingService.LogInfo($"프리셋이 복사되었습니다: '{newName}' (새 ID: {newPresetId})");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"프리셋 복사 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("프리셋 복사 실패");
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 삭제 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void DeletePresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset == null)
+            {
+                MessageBox.Show("삭제할 프리셋을 선택해주세요.", "선택 오류",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"정말로 '{_selectedPreset.Name}' 프리셋을 삭제하시겠습니까?\n\n" +
+                "이 작업은 되돌릴 수 없습니다.",
+                "삭제 확인",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    UpdateStatusText("프리셋 삭제 중...");
+
+                    await _apiService.DeletePresetAsync(_selectedPreset.Id);
+                    _loggingService.LogInfo($"프리셋이 삭제되었습니다: '{_selectedPreset.Name}' (ID: {_selectedPreset.Id})");
+
+                    await LoadPresets();
+                    UpdateStatusText("프리셋이 성공적으로 삭제되었습니다.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"프리셋 삭제 중 오류가 발생했습니다:\n{ex.Message}",
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UpdateStatusText("프리셋 삭제 실패");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 가져오기 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void ImportPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Title = "프리셋 파일 선택",
+                Filter = "JSON 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
+                DefaultExt = "json"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    UpdateStatusText("프리셋 가져오는 중...");
+
+                    var newPresetId = await _apiService.ImportPresetAsync(openFileDialog.FileName);
+                    _loggingService.LogInfo($"프리셋이 가져와졌습니다. 새 ID: {newPresetId}");
+
+                    await LoadPresets();
+                    UpdateStatusText("프리셋이 성공적으로 가져와졌습니다.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"프리셋 가져오기 중 오류가 발생했습니다:\n{ex.Message}",
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UpdateStatusText("프리셋 가져오기 실패");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 내보내기 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void ExportPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset == null)
+            {
+                MessageBox.Show("내보낼 프리셋을 선택해주세요.", "선택 오류",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var saveFileDialog = new SaveFileDialog
+            {
+                Title = "프리셋 내보내기",
+                Filter = "JSON 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
+                DefaultExt = "json",
+                FileName = $"{_selectedPreset.Name}_{DateTime.Now:yyyyMMdd_HHmmss}.json"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    UpdateStatusText("프리셋 내보내는 중...");
+
+                    var result = await _apiService.ExportPresetAsync(_selectedPreset.Id, saveFileDialog.FileName);
+                    _loggingService.LogInfo($"프리셋이 내보내졌습니다: {result?.FilePath}");
+
+                    UpdateStatusText("프리셋이 성공적으로 내보내졌습니다.");
+                    MessageBox.Show($"프리셋이 다음 위치에 저장되었습니다:\n{result?.FilePath}",
+                                  "내보내기 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"프리셋 내보내기 중 오류가 발생했습니다:\n{ex.Message}",
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UpdateStatusText("프리셋 내보내기 실패");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 적용 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void ApplyPresetButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset == null)
+            {
+                MessageBox.Show("적용할 프리셋을 선택해주세요.", "선택 오류",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                UpdateStatusText("프리셋 적용 중...");
+
+                var result = await _apiService.ApplyPresetAsync(_selectedPreset.Id);
+                _loggingService.LogInfo($"프리셋이 적용되었습니다: '{result?.PresetName}' ({result?.MacroCount}개 매크로)");
+
+                UpdateStatusText($"프리셋 '{result?.PresetName}'이 성공적으로 적용되었습니다.");
+                MessageBox.Show($"프리셋 '{result?.PresetName}'이 적용되었습니다.\n" +
+                              $"포함된 매크로: {result?.MacroCount}개",
+                              "적용 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"프리셋 적용 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("프리셋 적용 실패");
+            }
+        }
+
+        /// <summary>
+        /// 즐겨찾기 토글 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void ToggleFavoriteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset == null)
+            {
+                MessageBox.Show("프리셋을 선택해주세요.", "선택 오류",
+                              MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                UpdateStatusText("즐겨찾기 상태 변경 중...");
+
+                var newFavoriteStatus = await _apiService.TogglePresetFavoriteAsync(_selectedPreset.Id);
+                _loggingService.LogInfo($"프리셋 즐겨찾기 상태 변경: '{_selectedPreset.Name}' -> {(newFavoriteStatus ? "ON" : "OFF")}");
+
+                await LoadPresets();
+                UpdateStatusText($"즐겨찾기 상태가 {(newFavoriteStatus ? "추가" : "제거")}되었습니다.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"즐겨찾기 상태 변경 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("즐겨찾기 상태 변경 실패");
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 DataGrid 선택 변경 이벤트 핸들러
+        /// </summary>
+        private void PresetDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _selectedPreset = PresetDataGrid?.SelectedItem as PresetModel;
+            bool hasSelection = _selectedPreset != null;
+
+            // 선택된 항목이 있을 때만 관련 버튼들 활성화
+            EditPresetButton.IsEnabled = hasSelection;
+            CopyPresetButton.IsEnabled = hasSelection;
+            DeletePresetButton.IsEnabled = hasSelection;
+            ExportPresetButton.IsEnabled = hasSelection;
+            ApplyPresetButton.IsEnabled = hasSelection;
+            ToggleFavoriteButton.IsEnabled = hasSelection;
+
+            // 미리보기 패널 업데이트
+            UpdatePresetPreview();
+        }
+
+        /// <summary>
+        /// 프리셋 DataGrid 더블클릭 이벤트 핸들러 (프리셋 적용)
+        /// </summary>
+        private async void PresetDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (_selectedPreset != null)
+            {
+                await ApplyPreset(_selectedPreset.Id);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 미리보기 패널을 업데이트하는 함수
+        /// </summary>
+        private void UpdatePresetPreview()
+        {
+            try
+            {
+                if (_selectedPreset == null)
+                {
+                    // 선택된 프리셋이 없을 때
+                    if (NoPresetSelectedText != null) NoPresetSelectedText.Visibility = Visibility.Visible;
+                    if (PresetInfoPanel != null) PresetInfoPanel.Visibility = Visibility.Collapsed;
+                    if (PresetPreviewActions != null) PresetPreviewActions.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // 선택된 프리셋이 있을 때
+                if (NoPresetSelectedText != null) NoPresetSelectedText.Visibility = Visibility.Collapsed;
+                if (PresetInfoPanel != null) PresetInfoPanel.Visibility = Visibility.Visible;
+                if (PresetPreviewActions != null) PresetPreviewActions.Visibility = Visibility.Visible;
+
+                // 기본 정보 표시
+                if (PresetNameText != null) PresetNameText.Text = _selectedPreset.Name;
+                if (PresetDescriptionText != null) PresetDescriptionText.Text = _selectedPreset.DisplayDescription;
+                if (PresetCreatedText != null) PresetCreatedText.Text = $"생성일: {_selectedPreset.CreatedAtText}";
+
+                // 포함된 매크로 목록 로드 (비동기로 실행)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var detailedPreset = await _apiService.GetPresetAsync(_selectedPreset.Id);
+                        if (detailedPreset?.Macros != null)
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                if (PresetMacroListBox != null)
+                                    PresetMacroListBox.ItemsSource = detailedPreset.Macros;
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError("매크로 목록 로드 실패", ex);
+                    }
+                });
+
+                // 즐겨찾기 버튼 텍스트 업데이트
+                if (QuickFavoriteButton != null)
+                    QuickFavoriteButton.Content = _selectedPreset.IsFavorite ? "⭐ 즐겨찾기 제거" : "⭐ 즐겨찾기 추가";
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError("프리셋 미리보기 업데이트 실패", ex);
+            }
+        }
+
+        /// <summary>
+        /// 빠른 적용 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void QuickApplyButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset != null)
+            {
+                await ApplyPreset(_selectedPreset.Id);
+            }
+        }
+
+        /// <summary>
+        /// 빠른 즐겨찾기 토글 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void QuickFavoriteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedPreset != null)
+            {
+                await TogglePresetFavorite(_selectedPreset.Id);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋을 적용하는 헬퍼 메서드
+        /// </summary>
+        private async Task ApplyPreset(int presetId)
+        {
+            try
+            {
+                UpdateStatusText("프리셋 적용 중...");
+                var result = await _apiService.ApplyPresetAsync(presetId);
+                
+                if (result != null)
+                {
+                    MessageBox.Show($"프리셋이 성공적으로 적용되었습니다!\n프리셋명: {result.PresetName}\n적용된 매크로 수: {result.MacroCount}",
+                                  "프리셋 적용", MessageBoxButton.OK, MessageBoxImage.Information);
+                    UpdateStatusText($"프리셋 적용 완료 ({result.MacroCount}개 매크로)");
+                    _loggingService.LogInfo($"프리셋 적용 성공: ID {presetId}, 매크로 {result.MacroCount}개");
+                    
+                    // 매크로 목록 새로고침
+                    await LoadMacros();
+                }
+                else
+                {
+                    MessageBox.Show("프리셋 적용에 실패했습니다.",
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    UpdateStatusText("프리셋 적용 실패");
+                    _loggingService.LogError("프리셋 적용 실패: 서버에서 null 응답");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"프리셋 적용 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("프리셋 적용 실패");
+                _loggingService.LogError("프리셋 적용 중 오류 발생", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 즐겨찾기 상태를 토글하는 헬퍼 메서드
+        /// </summary>
+        private async Task TogglePresetFavorite(int presetId)
+        {
+            try
+            {
+                UpdateStatusText("즐겨찾기 상태 변경 중...");
+                var newFavoriteStatus = await _apiService.TogglePresetFavoriteAsync(presetId);
+                
+                var statusText = newFavoriteStatus ? "즐겨찾기에 추가" : "즐겨찾기에서 제거";
+                UpdateStatusText($"즐겨찾기 상태 변경 완료 ({statusText})");
+                _loggingService.LogInfo($"프리셋 즐겨찾기 상태 변경: ID {presetId}, {statusText}");
+                
+                // 프리셋 목록 새로고침
+                await LoadPresets();
+                await UpdatePresetStatistics();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"즐겨찾기 상태 변경 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("즐겨찾기 상태 변경 실패");
+                _loggingService.LogError("즐겨찾기 상태 변경 중 오류 발생", ex);
+            }
+        }
+
+        /// <summary>
+        /// 입력 다이얼로그를 표시하는 헬퍼 메서드
+        /// </summary>
+        /// <param name="title">다이얼로그 제목</param>
+        /// <param name="prompt">입력 안내 메시지</param>
+        /// <param name="defaultValue">기본값</param>
+        /// <returns>입력된 텍스트 (취소시 빈 문자열)</returns>
+        private string ShowInputDialog(string title, string prompt, string defaultValue = "")
+        {
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 400,
+                Height = 180,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize
+            };
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var promptLabel = new TextBlock
+            {
+                Text = prompt,
+                Margin = new Thickness(20, 20, 20, 10),
+                FontSize = 14
+            };
+            Grid.SetRow(promptLabel, 0);
+
+            var inputTextBox = new TextBox
+            {
+                Text = defaultValue,
+                Margin = new Thickness(20, 0, 20, 20),
+                FontSize = 14,
+                Height = 30
+            };
+            Grid.SetRow(inputTextBox, 1);
+
+            var buttonPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(20, 0, 20, 20)
+            };
+            
+            var okButton = new Button
+            {
+                Content = "확인",
+                Width = 70,
+                Height = 30,
+                Margin = new Thickness(0, 0, 10, 0),
+                IsDefault = true
+            };
+
+            var cancelButton = new Button
+            {
+                Content = "취소",
+                Width = 70,
+                Height = 30,
+                IsCancel = true
+            };
+
+            buttonPanel.Children.Add(okButton);
+            buttonPanel.Children.Add(cancelButton);
+            Grid.SetRow(buttonPanel, 2);
+
+            grid.Children.Add(promptLabel);
+            grid.Children.Add(inputTextBox);
+            grid.Children.Add(buttonPanel);
+
+            dialog.Content = grid;
+
+            bool? result = null;
+            okButton.Click += (s, e) => { result = true; dialog.Close(); };
+            cancelButton.Click += (s, e) => { result = false; dialog.Close(); };
+
+            inputTextBox.Focus();
+            inputTextBox.SelectAll();
+
+            dialog.ShowDialog();
+
+            return result == true ? inputTextBox.Text : "";
         }
     }
 } 

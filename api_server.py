@@ -5,11 +5,14 @@ from macro_service import macro_service
 from voice_recognition_service import get_voice_recognition_service
 from whisper_service import whisper_service
 from macro_execution_service import macro_execution_service
+from preset_service import preset_service
 import json
 import numpy as np
 import base64
 import asyncio
 import threading
+import os
+from werkzeug.utils import secure_filename
 from database import DatabaseManager
 
 # Flask 애플리케이션 초기화
@@ -968,6 +971,445 @@ def record_and_process_voice():
             'message': '음성 녹음 및 처리 실패'
         }), 500
 
+# ========== 프리셋 관리 API 엔드포인트 ==========
+
+@app.route('/api/presets', methods=['GET'])
+def get_presets():
+    """
+    모든 프리셋을 조회하는 API 엔드포인트
+    
+    쿼리 파라미터:
+    - search: 검색어 (선택사항)
+    - favorites_only: 즐겨찾기만 조회 (true/false)
+    
+    Returns:
+        JSON: 프리셋 목록
+    """
+    try:
+        search_term = request.args.get('search', None)
+        favorites_only = request.args.get('favorites_only', 'false').lower() == 'true'
+        
+        if favorites_only:
+            presets = preset_service.get_favorite_presets()
+        elif search_term:
+            presets = preset_service.search_presets(search_term)
+        else:
+            presets = preset_service.get_all_presets()
+        
+        return jsonify({
+            'success': True,
+            'data': presets,
+            'message': '프리셋 목록 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 목록 조회 실패'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>', methods=['GET'])
+def get_preset(preset_id):
+    """
+    특정 프리셋을 조회하는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 조회할 프리셋 ID
+        
+    Returns:
+        JSON: 프리셋 정보
+    """
+    try:
+        preset = preset_service.get_preset_by_id(preset_id)
+        
+        if preset:
+            # 포함된 매크로들의 상세 정보도 함께 조회
+            macro_details = []
+            for macro_id in preset['macro_ids']:
+                macro = macro_service.get_macro_by_id(macro_id)
+                if macro:
+                    macro_details.append(macro)
+            
+            preset['macros'] = macro_details
+            
+            return jsonify({
+                'success': True,
+                'data': preset,
+                'message': '프리셋 조회 성공'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '프리셋을 찾을 수 없습니다'
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 조회 실패'
+        }), 500
+
+@app.route('/api/presets', methods=['POST'])
+def create_preset():
+    """
+    새로운 프리셋을 생성하는 API 엔드포인트
+    
+    요청 본문:
+        name (str): 프리셋 이름
+        description (str): 프리셋 설명 (선택사항)
+        macro_ids (List[int]): 포함할 매크로 ID 목록
+        is_favorite (bool): 즐겨찾기 여부 (선택사항)
+        
+    Returns:
+        JSON: 생성된 프리셋 ID
+    """
+    try:
+        data = request.get_json()
+        
+        # 필수 필드 검증
+        if not data.get('name'):
+            return jsonify({
+                'success': False,
+                'message': '프리셋 이름은 필수입니다'
+            }), 400
+        
+        # 프리셋 생성
+        preset_id = preset_service.create_preset(
+            name=data['name'],
+            description=data.get('description', ''),
+            macro_ids=data.get('macro_ids', []),
+            is_favorite=data.get('is_favorite', False)
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {'id': preset_id},
+            'message': '프리셋이 성공적으로 생성되었습니다'
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 생성 실패'
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 생성 중 오류 발생'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>', methods=['PUT'])
+def update_preset(preset_id):
+    """
+    기존 프리셋을 수정하는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 수정할 프리셋 ID
+        
+    요청 본문:
+        수정할 필드들 (모든 필드는 선택사항)
+        
+    Returns:
+        JSON: 수정 결과
+    """
+    try:
+        data = request.get_json()
+        
+        # 프리셋 수정
+        success = preset_service.update_preset(
+            preset_id=preset_id,
+            name=data.get('name'),
+            description=data.get('description'),
+            macro_ids=data.get('macro_ids'),
+            is_favorite=data.get('is_favorite')
+        )
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '프리셋이 성공적으로 수정되었습니다'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '프리셋을 찾을 수 없습니다'
+            }), 404
+            
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 수정 실패'
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 수정 중 오류 발생'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>/copy', methods=['POST'])
+def copy_preset(preset_id):
+    """
+    프리셋을 복사하는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 복사할 프리셋 ID
+        
+    요청 본문:
+        new_name (str): 새로운 프리셋 이름 (선택사항)
+        
+    Returns:
+        JSON: 복사된 프리셋 ID
+    """
+    try:
+        data = request.get_json()
+        new_name = data.get('new_name') if data else None
+        
+        # 프리셋 복사
+        new_preset_id = preset_service.copy_preset(preset_id, new_name)
+        
+        return jsonify({
+            'success': True,
+            'data': {'id': new_preset_id},
+            'message': '프리셋이 성공적으로 복사되었습니다'
+        }), 201
+            
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 복사 실패'
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 복사 중 오류 발생'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>', methods=['DELETE'])
+def delete_preset(preset_id):
+    """
+    프리셋을 삭제하는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 삭제할 프리셋 ID
+        
+    쿼리 파라미터:
+        hard_delete: 완전 삭제 여부 (true/false, 기본값: false)
+        
+    Returns:
+        JSON: 삭제 결과
+    """
+    try:
+        hard_delete = request.args.get('hard_delete', 'false').lower() == 'true'
+        success = preset_service.delete_preset(preset_id, hard_delete)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '프리셋이 성공적으로 삭제되었습니다'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '프리셋을 찾을 수 없습니다'
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 삭제 실패'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>/toggle-favorite', methods=['POST'])
+def toggle_preset_favorite(preset_id):
+    """
+    프리셋 즐겨찾기 상태를 토글하는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 토글할 프리셋 ID
+        
+    Returns:
+        JSON: 새로운 즐겨찾기 상태
+    """
+    try:
+        new_favorite_status = preset_service.toggle_favorite(preset_id)
+        
+        return jsonify({
+            'success': True,
+            'data': {'is_favorite': new_favorite_status},
+            'message': f'프리셋이 {"즐겨찾기에 추가" if new_favorite_status else "즐겨찾기에서 제거"}되었습니다'
+        }), 200
+            
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋을 찾을 수 없습니다'
+        }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '즐겨찾기 토글 실패'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>/apply', methods=['POST'])
+def apply_preset(preset_id):
+    """
+    프리셋을 적용하는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 적용할 프리셋 ID
+        
+    Returns:
+        JSON: 적용 결과
+    """
+    try:
+        success = preset_service.apply_preset(preset_id)
+        
+        if success:
+            preset = preset_service.get_preset_by_id(preset_id)
+            return jsonify({
+                'success': True,
+                'data': {
+                    'preset_id': preset_id,
+                    'preset_name': preset['name'] if preset else 'Unknown',
+                    'macro_count': len(preset['macro_ids']) if preset else 0
+                },
+                'message': '프리셋이 성공적으로 적용되었습니다'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '프리셋을 찾을 수 없습니다'
+            }), 404
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 적용 실패'
+        }), 500
+
+@app.route('/api/presets/<int:preset_id>/export', methods=['POST'])
+def export_preset(preset_id):
+    """
+    프리셋을 JSON 파일로 내보내는 API 엔드포인트
+    
+    Args:
+        preset_id (int): 내보낼 프리셋 ID
+        
+    요청 본문:
+        file_path (str): 저장할 파일 경로 (선택사항)
+        
+    Returns:
+        JSON: 내보낸 파일 경로
+    """
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path') if data else None
+        
+        exported_file_path = preset_service.export_preset_to_json(preset_id, file_path)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'file_path': exported_file_path,
+                'file_name': os.path.basename(exported_file_path)
+            },
+            'message': '프리셋이 성공적으로 내보내졌습니다'
+        }), 200
+            
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 내보내기 실패'
+        }), 404
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 내보내기 중 오류 발생'
+        }), 500
+
+@app.route('/api/presets/import', methods=['POST'])
+def import_preset():
+    """
+    JSON 파일에서 프리셋을 가져오는 API 엔드포인트
+    
+    요청 본문:
+        file_path (str): 가져올 JSON 파일 경로
+        preset_name (str): 새로운 프리셋 이름 (선택사항)
+        
+    Returns:
+        JSON: 가져온 프리셋 ID
+    """
+    try:
+        data = request.get_json()
+        
+        if not data.get('file_path'):
+            return jsonify({
+                'success': False,
+                'message': '파일 경로가 필요합니다'
+            }), 400
+        
+        preset_id = preset_service.import_preset_from_json(
+            file_path=data['file_path'],
+            preset_name=data.get('preset_name')
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {'id': preset_id},
+            'message': '프리셋이 성공적으로 가져와졌습니다'
+        }), 201
+            
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 가져오기 실패'
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 가져오기 중 오류 발생'
+        }), 500
+
+@app.route('/api/presets/statistics', methods=['GET'])
+def get_preset_statistics():
+    """
+    프리셋 통계 정보를 조회하는 API 엔드포인트
+    
+    Returns:
+        JSON: 프리셋 통계
+    """
+    try:
+        stats = preset_service.get_preset_statistics()
+        
+        return jsonify({
+            'success': True,
+            'data': stats,
+            'message': '프리셋 통계 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '프리셋 통계 조회 실패'
+        }), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """
@@ -976,10 +1418,31 @@ def health_check():
     Returns:
         JSON: 서버 상태 정보
     """
-    return jsonify({
-        'status': 'healthy',
-        'message': 'VoiceMacro API 서버가 정상 작동 중입니다'
-    }), 200
+    try:
+        # 데이터베이스 연결 테스트
+        db_manager = DatabaseManager()
+        macros_count = len(macro_service.get_all_macros())
+        presets_count = len(preset_service.get_all_presets())
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'status': 'healthy',
+                'service': 'VoiceMacro Pro API',
+                'version': '1.0.0',
+                'macros_count': macros_count,
+                'presets_count': presets_count,
+                'whisper_status': 'ready' if whisper_service else 'not_initialized'
+            },
+            'message': '서버가 정상적으로 동작 중입니다'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '서버 상태 확인 실패'
+        }), 500
 
 if __name__ == '__main__':
     """
