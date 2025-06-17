@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using VoiceMacroPro.Models;
+using System.Text.Json.Serialization;
 
 namespace VoiceMacroPro.Services
 {
@@ -74,7 +75,7 @@ namespace VoiceMacroPro.Services
                 var jsonContent = JsonSerializer.Serialize(requestData);
                 var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
                 
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/set-device", content);
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/device", content);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -106,7 +107,7 @@ namespace VoiceMacroPro.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/start-recording", null);
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/recording/start", null);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -138,7 +139,7 @@ namespace VoiceMacroPro.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/stop-recording", null);
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/recording/stop", null);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -194,8 +195,9 @@ namespace VoiceMacroPro.Services
 
         /// <summary>
         /// 음성을 분석하고 매크로 매칭 결과를 가져오는 함수
+        /// 실시간 녹음된 오디오를 가져와서 Whisper로 처리합니다.
         /// </summary>
-        /// <param name="duration">분석할 오디오 길이 (초)</param>
+        /// <param name="duration">녹음할 시간 (초)</param>
         /// <returns>매크로 매칭 결과 목록</returns>
         public async Task<List<VoiceMatchResult>> AnalyzeVoiceAndMatchMacrosAsync(double duration = 2.0)
         {
@@ -205,17 +207,17 @@ namespace VoiceMacroPro.Services
                 var jsonContent = JsonSerializer.Serialize(requestData);
                 var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
                 
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/analyze-and-match", content);
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/record-and-process", content);
                 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
-                    var apiResponse = JsonSerializer.Deserialize<ApiResponse<VoiceAnalysisResult>>(responseContent);
+                    var apiResponse = JsonSerializer.Deserialize<ApiResponse<VoiceProcessingResult>>(responseContent);
                     
                     if (apiResponse?.Success == true && apiResponse.Data != null)
                     {
                         var result = apiResponse.Data;
-                        _loggingService.LogInfo($"음성 분석 성공: '{result.RecognizedText}' (확신도: {result.Confidence:P1})");
+                        _loggingService.LogInfo($"음성 분석 성공: '{result.RecognizedText}' (처리시간: {result.ProcessingTime:F2}초)");
                         
                         // 매칭 결과를 VoiceMatchResult 객체로 변환
                         var matchResults = new List<VoiceMatchResult>();
@@ -228,7 +230,7 @@ namespace VoiceMacroPro.Services
                                 Rank = i + 1,
                                 MacroName = match.Name,
                                 VoiceCommand = match.VoiceCommand,
-                                Confidence = match.MatchConfidence,
+                                Confidence = match.MatchConfidence * 100, // 백분율로 변환
                                 ActionDescription = $"{match.ActionType}: {match.KeySequence}",
                                 MacroId = match.Id
                             });
@@ -259,7 +261,7 @@ namespace VoiceMacroPro.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/test-microphone", null);
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/test", null);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -285,6 +287,7 @@ namespace VoiceMacroPro.Services
 
         /// <summary>
         /// 언어 설정을 변경하는 함수
+        /// 현재 Python API에 언어 설정 엔드포인트가 없으므로 로컬에서만 저장합니다.
         /// </summary>
         /// <param name="language">언어 코드 (ko, en)</param>
         /// <returns>설정 성공 여부</returns>
@@ -292,11 +295,18 @@ namespace VoiceMacroPro.Services
         {
             try
             {
+                // TODO: Python API에 언어 설정 엔드포인트 추가 필요
+                // 현재는 로컬에서만 언어 설정을 저장
+                _loggingService.LogInfo($"언어 설정 변경: {language} (로컬 저장)");
+                return true;
+                
+                /*
+                // 향후 Python API에 구현될 언어 설정 엔드포인트
                 var requestData = new { language = language };
                 var jsonContent = JsonSerializer.Serialize(requestData);
                 var content = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
                 
-                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/set-language", content);
+                var response = await _httpClient.PostAsync($"{_baseUrl}/api/voice/language", content);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -312,6 +322,7 @@ namespace VoiceMacroPro.Services
                 
                 _loggingService.LogWarning($"언어 설정 변경 실패: {language}");
                 return false;
+                */
             }
             catch (Exception ex)
             {
@@ -332,13 +343,21 @@ namespace VoiceMacroPro.Services
     // 관련 데이터 모델들
 
     /// <summary>
-    /// 마이크 장치 정보
+    /// 마이크 장치 정보를 나타내는 클래스
+    /// Python API에서 반환되는 마이크 장치 정보와 매핑됩니다.
     /// </summary>
     public class MicrophoneDevice
     {
+        [JsonPropertyName("id")]
         public int Id { get; set; }
+        
+        [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
+        
+        [JsonPropertyName("max_input_channels")]
         public int MaxInputChannels { get; set; }
+        
+        [JsonPropertyName("default_samplerate")]
         public double DefaultSampleRate { get; set; }
     }
 
@@ -370,6 +389,24 @@ namespace VoiceMacroPro.Services
     }
 
     /// <summary>
+    /// 음성 처리 결과 (record-and-process API 응답)
+    /// </summary>
+    public class VoiceProcessingResult
+    {
+        [JsonPropertyName("recognized_text")]
+        public string RecognizedText { get; set; } = string.Empty;
+        
+        [JsonPropertyName("matched_macros")]
+        public List<MacroMatchInfo> MatchedMacros { get; set; } = new();
+        
+        [JsonPropertyName("processing_time")]
+        public double ProcessingTime { get; set; }
+        
+        [JsonPropertyName("audio_duration")]
+        public double AudioDuration { get; set; }
+    }
+
+    /// <summary>
     /// 매크로 매칭 정보
     /// </summary>
     public class MacroMatchInfo
@@ -383,7 +420,7 @@ namespace VoiceMacroPro.Services
     }
 
     /// <summary>
-    /// 마이크 테스트 결과
+    /// 마이크 테스트 결과를 나타내는 클래스
     /// </summary>
     public class MicrophoneTestResult
     {

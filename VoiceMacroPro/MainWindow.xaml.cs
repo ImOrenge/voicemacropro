@@ -633,12 +633,59 @@ namespace VoiceMacroPro
                 // 초기 UI 상태 설정
                 UpdateRecordingUI();
                 
-                // 마이크 장치 목록 로드 (비동기적으로)
+                // 마이크 장치 목록 로드 (서버 연결 확인 후 비동기적으로)
                 Task.Run(async () => 
                 {
                     try
                     {
-                        await LoadMicrophoneDevices();
+                        // 서버 연결 대기 (최대 10초)
+                        bool serverConnected = false;
+                        for (int i = 0; i < 10; i++)
+                        {
+                            try
+                            {
+                                using var httpClient = new System.Net.Http.HttpClient();
+                                var testResponse = await httpClient.GetAsync("http://localhost:5000/api/health");
+                                if (testResponse.IsSuccessStatusCode)
+                                {
+                                    serverConnected = true;
+                                    break;
+                                }
+                            }
+                            catch
+                            {
+                                // 연결 실패, 1초 대기 후 재시도
+                            }
+                            
+                            await Task.Delay(1000);
+                        }
+                        
+                        if (serverConnected)
+                        {
+                            _loggingService.LogInfo("서버 연결 확인됨. 마이크 장치 목록 로드 시작...");
+                            await LoadMicrophoneDevices();
+                        }
+                        else
+                        {
+                            _loggingService.LogError("서버에 연결할 수 없습니다. 마이크 목록을 로드할 수 없습니다.");
+                            
+                            // UI에 오류 메시지 표시
+                            await Application.Current.Dispatcher.InvokeAsync(() =>
+                            {
+                                if (MicrophoneComboBox != null)
+                                {
+                                    MicrophoneComboBox.Items.Clear();
+                                    var errorItem = new ComboBoxItem
+                                    {
+                                        Content = "서버 연결 실패 - API 서버 시작 필요",
+                                        Tag = -1,
+                                        IsEnabled = false
+                                    };
+                                    MicrophoneComboBox.Items.Add(errorItem);
+                                    MicrophoneComboBox.SelectedIndex = 0;
+                                }
+                            });
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -662,39 +709,106 @@ namespace VoiceMacroPro
         {
             try
             {
+                _loggingService.LogInfo("마이크 장치 목록 로드 시작...");
+                System.Diagnostics.Debug.WriteLine("마이크 장치 목록 로드 시작...");
+                
                 var devices = await _voiceService.GetAvailableDevicesAsync();
+                
+                _loggingService.LogInfo($"API에서 {devices?.Count ?? 0}개의 마이크 장치를 반환했습니다.");
+                System.Diagnostics.Debug.WriteLine($"API에서 {devices?.Count ?? 0}개의 마이크 장치를 반환했습니다.");
                 
                 // UI 스레드에서 ComboBox 업데이트
                 await Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    if (MicrophoneComboBox != null)
+                    try
                     {
-                        MicrophoneComboBox.Items.Clear();
-                        
-                        foreach (var device in devices)
+                        if (MicrophoneComboBox != null)
                         {
-                            var item = new ComboBoxItem
+                            _loggingService.LogInfo("ComboBox 업데이트 시작...");
+                            System.Diagnostics.Debug.WriteLine("ComboBox 업데이트 시작...");
+                            
+                            MicrophoneComboBox.Items.Clear();
+                            
+                            if (devices != null && devices.Count > 0)
                             {
-                                Content = device.Name,
-                                Tag = device.Id
-                            };
-                            MicrophoneComboBox.Items.Add(item);
+                                foreach (var device in devices)
+                                {
+                                    var item = new ComboBoxItem
+                                    {
+                                        Content = device.Name,
+                                        Tag = device.Id
+                                    };
+                                    MicrophoneComboBox.Items.Add(item);
+                                    
+                                    _loggingService.LogInfo($"마이크 추가: [{device.Id}] {device.Name}");
+                                    System.Diagnostics.Debug.WriteLine($"마이크 추가: [{device.Id}] {device.Name}");
+                                }
+                                
+                                // 첫 번째 장치를 기본으로 선택
+                                MicrophoneComboBox.SelectedIndex = 0;
+                                
+                                _loggingService.LogInfo($"ComboBox에 {devices.Count}개 장치 추가 완료. 첫 번째 장치 선택됨.");
+                                System.Diagnostics.Debug.WriteLine($"ComboBox에 {devices.Count}개 장치 추가 완료. 첫 번째 장치 선택됨.");
+                            }
+                            else
+                            {
+                                _loggingService.LogWarning("API에서 반환된 마이크 장치가 없습니다.");
+                                System.Diagnostics.Debug.WriteLine("API에서 반환된 마이크 장치가 없습니다.");
+                                
+                                // 기본 메시지 추가
+                                var defaultItem = new ComboBoxItem
+                                {
+                                    Content = "마이크 장치를 찾을 수 없습니다",
+                                    Tag = -1,
+                                    IsEnabled = false
+                                };
+                                MicrophoneComboBox.Items.Add(defaultItem);
+                                MicrophoneComboBox.SelectedIndex = 0;
+                            }
                         }
-                        
-                        // 첫 번째 장치를 기본으로 선택
-                        if (devices.Count > 0)
+                        else
                         {
-                            MicrophoneComboBox.SelectedIndex = 0;
+                            _loggingService.LogError("MicrophoneComboBox가 null입니다!");
+                            System.Diagnostics.Debug.WriteLine("MicrophoneComboBox가 null입니다!");
                         }
+                    }
+                    catch (Exception uiEx)
+                    {
+                        _loggingService.LogError($"UI 업데이트 중 오류: {uiEx.Message}");
+                        System.Diagnostics.Debug.WriteLine($"UI 업데이트 중 오류: {uiEx}");
                     }
                 });
                 
-                _loggingService.LogInfo($"마이크 장치 목록 로드 완료: {devices.Count}개 장치");
+                _loggingService.LogInfo($"마이크 장치 목록 로드 완료: {devices?.Count ?? 0}개 장치");
             }
             catch (Exception ex)
             {
                 _loggingService.LogError($"마이크 장치 목록 로드 중 오류: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"마이크 장치 로드 오류: {ex}");
+                
+                // 오류 발생 시에도 기본 메시지 표시
+                try
+                {
+                    await Application.Current.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (MicrophoneComboBox != null)
+                        {
+                            MicrophoneComboBox.Items.Clear();
+                            var errorItem = new ComboBoxItem
+                            {
+                                Content = "마이크 로드 실패 - 서버 연결 확인",
+                                Tag = -1,
+                                IsEnabled = false
+                            };
+                            MicrophoneComboBox.Items.Add(errorItem);
+                            MicrophoneComboBox.SelectedIndex = 0;
+                        }
+                    });
+                }
+                catch (Exception dispatcherEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Dispatcher 오류: {dispatcherEx}");
+                }
             }
         }
 
@@ -778,11 +892,16 @@ namespace VoiceMacroPro
 
         /// <summary>
         /// 녹음 시작 버튼 클릭 이벤트 핸들러
+        /// 녹음 시작 전에 자동으로 마이크 장치를 설정합니다.
         /// </summary>
         private async void StartRecordingButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                // 1. 먼저 마이크 장치가 설정되어 있는지 확인하고 자동 설정
+                await EnsureMicrophoneDeviceSet();
+                
+                // 2. 녹음 시작
                 var success = await _voiceService.StartRecordingAsync();
                 
                 if (success)
@@ -792,11 +911,11 @@ namespace VoiceMacroPro
                     
                     if (RecognizedTextBlock != null)
                     {
-                        RecognizedTextBlock.Text = "음성을 인식하고 있습니다...";
+                        RecognizedTextBlock.Text = "🎤 음성을 인식하고 있습니다...";
                         RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Blue);
                     }
                     
-                    _loggingService.LogInfo("음성 녹음이 시작되었습니다.");
+                    _loggingService.LogInfo("✅ 음성 녹음이 시작되었습니다.");
                     
                     // 2초 후 자동으로 음성 분석 시작
                     await Task.Delay(2000);
@@ -807,14 +926,19 @@ namespace VoiceMacroPro
                 }
                 else
                 {
-                    MessageBox.Show("음성 녹음을 시작할 수 없습니다.", "오류", 
-                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    _loggingService.LogWarning("❌ 음성 녹음 시작 실패");
+                    MessageBox.Show("❌ 음성 녹음을 시작할 수 없습니다.\n\n" +
+                                  "💡 해결 방법:\n" +
+                                  "• 마이크 장치가 올바르게 설정되었는지 확인\n" +
+                                  "• 다른 프로그램에서 마이크를 사용하고 있지 않은지 확인\n" +
+                                  "• Windows 마이크 권한 설정 확인", 
+                                  "녹음 실패", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"녹음 시작 중 오류: {ex.Message}");
-                MessageBox.Show($"녹음 시작 중 오류가 발생했습니다:\n{ex.Message}", 
+                _loggingService.LogError($"❌ 녹음 시작 중 오류: {ex.Message}");
+                MessageBox.Show($"❌ 녹음 시작 중 오류가 발생했습니다:\n{ex.Message}", 
                               "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -965,6 +1089,7 @@ namespace VoiceMacroPro
 
         /// <summary>
         /// 마이크 테스트 버튼 클릭 이벤트 핸들러
+        /// 테스트 전에 자동으로 마이크 장치를 설정합니다.
         /// </summary>
         private async void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
         {
@@ -976,6 +1101,10 @@ namespace VoiceMacroPro
                     TestMicrophoneButton.Content = "🔄 테스트 중...";
                 }
                 
+                // 1. 먼저 마이크 장치가 설정되어 있는지 확인하고 자동 설정
+                await EnsureMicrophoneDeviceSet();
+                
+                // 2. 마이크 테스트 수행
                 var result = await _voiceService.TestMicrophoneAsync();
                 
                 if (result != null)
@@ -983,7 +1112,7 @@ namespace VoiceMacroPro
                     string message;
                     if (result.Success)
                     {
-                        message = "마이크 테스트 성공!\n\n" +
+                        message = "✅ 마이크 테스트 성공!\n\n" +
                                 $"• 장치 사용 가능: {(result.DeviceAvailable ? "✅" : "❌")}\n" +
                                 $"• 녹음 테스트: {(result.RecordingTest ? "✅" : "❌")}\n" +
                                 $"• 오디오 레벨 감지: {(result.AudioLevelDetected ? "✅" : "❌")}\n" +
@@ -992,27 +1121,35 @@ namespace VoiceMacroPro
                         MessageBox.Show(message, "마이크 테스트 완료", 
                                       MessageBoxButton.OK, MessageBoxImage.Information);
                         
-                        _loggingService.LogInfo("마이크 테스트 성공");
+                        _loggingService.LogInfo("✅ 마이크 테스트 성공: 모든 항목 통과");
                     }
                     else
                     {
-                        message = $"마이크 테스트 실패\n\n오류: {result.ErrorMessage}";
+                        message = $"❌ 마이크 테스트 실패\n\n" +
+                                $"오류: {result.ErrorMessage}\n\n" +
+                                $"💡 해결 방법:\n" +
+                                $"• 마이크가 다른 프로그램에서 사용 중인지 확인\n" +
+                                $"• Windows 마이크 권한 설정 확인\n" +
+                                $"• 마이크 드라이버 업데이트 시도";
+                        
                         MessageBox.Show(message, "마이크 테스트 실패", 
                                       MessageBoxButton.OK, MessageBoxImage.Warning);
                         
-                        _loggingService.LogWarning($"마이크 테스트 실패: {result.ErrorMessage}");
+                        _loggingService.LogWarning($"❌ 마이크 테스트 실패: {result.ErrorMessage}");
                     }
                 }
                 else
                 {
-                    MessageBox.Show("마이크 테스트를 수행할 수 없습니다.", "오류", 
-                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("❌ 마이크 테스트를 수행할 수 없습니다.\n\n" +
+                                  "서버 연결을 확인해주세요.", 
+                                  "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                    _loggingService.LogError("마이크 테스트 실패: 응답이 null");
                 }
             }
             catch (Exception ex)
             {
                 _loggingService.LogError($"마이크 테스트 중 오류: {ex.Message}");
-                MessageBox.Show($"마이크 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                MessageBox.Show($"❌ 마이크 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
                               "오류", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
@@ -1271,6 +1408,114 @@ namespace VoiceMacroPro
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"윈도우 종료 중 오류: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 마이크 목록 수동 새로고침 (디버깅용)
+        /// </summary>
+        public async Task RefreshMicrophoneDevicesManually()
+        {
+            try
+            {
+                _loggingService.LogInfo("🔄 마이크 목록 수동 새로고침 시작...");
+                await LoadMicrophoneDevices();
+                _loggingService.LogInfo("✅ 마이크 목록 수동 새로고침 완료");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ 마이크 목록 수동 새로고침 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 마이크 새로고침 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void RefreshMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _loggingService.LogInfo("🔄 사용자가 마이크 목록 새로고침을 요청했습니다.");
+                await RefreshMicrophoneDevicesManually();
+                
+                MessageBox.Show("마이크 목록이 새로고침되었습니다.\n로그 탭에서 자세한 정보를 확인하세요.", 
+                              "정보", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"마이크 새로고침 버튼 오류: {ex.Message}");
+                MessageBox.Show($"마이크 목록 새로고침 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 마이크 장치가 설정되어 있는지 확인하고 자동으로 설정하는 함수
+        /// </summary>
+        private async Task EnsureMicrophoneDeviceSet()
+        {
+            try
+            {
+                _loggingService.LogInfo("🔍 마이크 장치 설정 상태 확인 중...");
+                
+                // 현재 음성 상태 확인
+                var status = await _voiceService.GetRecordingStatusAsync();
+                
+                if (status == null || status.CurrentDevice < 0)
+                {
+                    _loggingService.LogWarning("⚠️ 마이크 장치가 설정되지 않음. 자동 설정 시도...");
+                    
+                    // 사용 가능한 마이크 장치 목록 가져오기
+                    var devices = await _voiceService.GetAvailableDevicesAsync();
+                    
+                    if (devices != null && devices.Count > 0)
+                    {
+                        // GM50U 마이크를 우선적으로 찾기
+                        var preferredDevice = devices.FirstOrDefault(d => d.Name.Contains("GM50U"));
+                        
+                        // GM50U가 없으면 첫 번째 사용 가능한 장치 선택
+                        if (preferredDevice == null)
+                        {
+                            preferredDevice = devices.FirstOrDefault(d => d.Id > 0); // Microsoft 사운드 매퍼 제외
+                        }
+                        
+                        if (preferredDevice != null)
+                        {
+                            var success = await _voiceService.SetMicrophoneDeviceAsync(preferredDevice.Id);
+                            
+                            if (success)
+                            {
+                                _loggingService.LogInfo($"✅ 마이크 장치 자동 설정 성공: [{preferredDevice.Id}] {preferredDevice.Name}");
+                                
+                                // UI 업데이트
+                                if (MicrophoneComboBox != null)
+                                {
+                                    MicrophoneComboBox.SelectedValue = preferredDevice.Id;
+                                }
+                            }
+                            else
+                            {
+                                _loggingService.LogWarning($"❌ 마이크 장치 설정 실패: [{preferredDevice.Id}] {preferredDevice.Name}");
+                            }
+                        }
+                        else
+                        {
+                            _loggingService.LogWarning("⚠️ 설정할 수 있는 마이크 장치를 찾을 수 없음");
+                        }
+                    }
+                    else
+                    {
+                        _loggingService.LogError("❌ 사용 가능한 마이크 장치가 없음");
+                    }
+                }
+                else
+                {
+                    _loggingService.LogInfo($"✅ 마이크 장치가 이미 설정됨: 장치 ID {status.CurrentDevice}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ 마이크 장치 설정 확인 중 오류: {ex.Message}");
             }
         }
     }
