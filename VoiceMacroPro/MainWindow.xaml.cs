@@ -1918,7 +1918,7 @@ namespace VoiceMacroPro
         /// <summary>
         /// 토글 테스트 버튼 클릭 이벤트 핸들러
         /// </summary>
-        private async void TestToggleButton_Click(object sender, RoutedEventArgs e)
+        private void TestToggleButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {

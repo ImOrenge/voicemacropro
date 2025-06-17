@@ -291,14 +291,14 @@ namespace VoiceMacroPro.Services
         /// </summary>
         /// <param name="language">언어 코드 (ko, en)</param>
         /// <returns>설정 성공 여부</returns>
-        public async Task<bool> SetLanguageAsync(string language)
+        public Task<bool> SetLanguageAsync(string language)
         {
             try
             {
                 // TODO: Python API에 언어 설정 엔드포인트 추가 필요
                 // 현재는 로컬에서만 언어 설정을 저장
                 _loggingService.LogInfo($"언어 설정 변경: {language} (로컬 저장)");
-                return true;
+                return Task.FromResult(true);
                 
                 /*
                 // 향후 Python API에 구현될 언어 설정 엔드포인트
@@ -327,7 +327,7 @@ namespace VoiceMacroPro.Services
             catch (Exception ex)
             {
                 _loggingService.LogError($"언어 설정 변경 중 오류: {ex.Message}");
-                return false;
+                return Task.FromResult(false);
             }
         }
 
