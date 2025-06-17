@@ -1,0 +1,169 @@
+<Window x:Class="VoiceMacroPro.Views.MacroEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="매크로 편집" 
+        Height="500" Width="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    
+    <Grid Background="#ECF0F1">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 제목 영역 -->
+        <Border Grid.Row="0" Background="#34495E" Padding="20,15">
+            <TextBlock Name="TitleTextBlock" 
+                      Text="새 매크로 추가" 
+                      FontSize="18" 
+                      FontWeight="Bold" 
+                      Foreground="White"/>
+        </Border>
+        
+        <!-- 입력 폼 영역 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="20">
+            <StackPanel>
+                
+                <!-- 매크로 이름 -->
+                <Border Background="White" CornerRadius="5" Padding="15" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock Text="매크로 이름 *" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBox Name="NameTextBox" 
+                                Height="30" 
+                                FontSize="14"
+                                VerticalContentAlignment="Center"/>
+                        <TextBlock Text="매크로를 식별할 수 있는 고유한 이름을 입력하세요." 
+                                  FontSize="11" 
+                                  Foreground="#7F8C8D" 
+                                  Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 음성 명령어 -->
+                <Border Background="White" CornerRadius="5" Padding="15" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock Text="음성 명령어 *" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBox Name="VoiceCommandTextBox" 
+                                Height="30" 
+                                FontSize="14"
+                                VerticalContentAlignment="Center"/>
+                        <TextBlock Text="음성으로 말할 때 인식될 명령어를 입력하세요. (예: 공격, 스킬 사용 등)" 
+                                  FontSize="11" 
+                                  Foreground="#7F8C8D" 
+                                  Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 동작 타입 -->
+                <Border Background="White" CornerRadius="5" Padding="15" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock Text="동작 타입 *" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <ComboBox Name="ActionTypeComboBox" 
+                                 Height="30" 
+                                 FontSize="14"
+                                 SelectedIndex="0">
+                            <ComboBoxItem Content="콤보 (여러 키를 순차적으로 입력)" Tag="combo"/>
+                            <ComboBoxItem Content="연사 (키를 빠르게 반복 입력)" Tag="rapid"/>
+                            <ComboBoxItem Content="홀드 (키를 눌러서 유지)" Tag="hold"/>
+                            <ComboBoxItem Content="토글 (키를 ON/OFF 전환)" Tag="toggle"/>
+                            <ComboBoxItem Content="반복 (특정 횟수만큼 반복)" Tag="repeat"/>
+                        </ComboBox>
+                        <TextBlock Text="매크로가 수행할 동작의 종류를 선택하세요." 
+                                  FontSize="11" 
+                                  Foreground="#7F8C8D" 
+                                  Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 키 시퀀스 -->
+                <Border Background="White" CornerRadius="5" Padding="15" Margin="0,0,0,15">
+                    <StackPanel>
+                        <TextBlock Text="키 시퀀스 *" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <TextBox Name="KeySequenceTextBox" 
+                                Height="60" 
+                                FontSize="14"
+                                VerticalContentAlignment="Top"
+                                TextWrapping="Wrap"
+                                AcceptsReturn="True"
+                                VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock Text="실행할 키보드 입력을 지정하세요. (예: Ctrl+C, Space, Enter 등)" 
+                                  FontSize="11" 
+                                  Foreground="#7F8C8D" 
+                                  Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 추가 설정 -->
+                <Border Background="White" CornerRadius="5" Padding="15" Margin="0,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="추가 설정" FontWeight="Bold" Margin="0,0,0,8"/>
+                        
+                        <!-- 지연 시간 설정 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="지연 시간:" VerticalAlignment="Center" Width="80"/>
+                            <TextBox Name="DelayTextBox" 
+                                    Width="100" 
+                                    Height="25"
+                                    Text="100"
+                                    VerticalContentAlignment="Center"/>
+                            <TextBlock Text="ms" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                            <TextBlock Text="(키 입력 간의 대기 시간)" 
+                                      FontSize="11" 
+                                      Foreground="#7F8C8D" 
+                                      VerticalAlignment="Center" 
+                                      Margin="10,0,0,0"/>
+                        </StackPanel>
+                        
+                        <!-- 반복 횟수 설정 -->
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="반복 횟수:" VerticalAlignment="Center" Width="80"/>
+                            <TextBox Name="RepeatCountTextBox" 
+                                    Width="100" 
+                                    Height="25"
+                                    Text="1"
+                                    VerticalContentAlignment="Center"/>
+                            <TextBlock Text="회" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                            <TextBlock Text="(반복 타입일 때만 적용)" 
+                                      FontSize="11" 
+                                      Foreground="#7F8C8D" 
+                                      VerticalAlignment="Center" 
+                                      Margin="10,0,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+        
+        <!-- 버튼 영역 -->
+        <Border Grid.Row="2" Background="#BDC3C7" Padding="20,15">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Name="TestButton" 
+                       Content="🧪 테스트" 
+                       Margin="0,0,10,0" 
+                       Padding="20,8" 
+                       Background="#F39C12" 
+                       Foreground="White" 
+                       BorderThickness="0"
+                       Click="TestButton_Click"/>
+                <Button Name="SaveButton" 
+                       Content="💾 저장" 
+                       Margin="0,0,10,0" 
+                       Padding="20,8" 
+                       Background="#27AE60" 
+                       Foreground="White" 
+                       BorderThickness="0"
+                       Click="SaveButton_Click"/>
+                <Button Name="CancelButton" 
+                       Content="❌ 취소" 
+                       Padding="20,8" 
+                       Background="#95A5A6" 
+                       Foreground="White" 
+                       BorderThickness="0"
+                       IsCancel="True"
+                       Click="CancelButton_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window> 

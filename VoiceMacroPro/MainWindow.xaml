@@ -1,0 +1,291 @@
+<Window x:Class="VoiceMacroPro.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VoiceMacro Pro - 게임 AI 음성 매크로" 
+        Height="700" Width="1200"
+        WindowStartupLocation="CenterScreen">
+    
+    <!-- 메인 그리드 레이아웃 -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 상단 제목 영역 -->
+        <Border Grid.Row="0" Background="#2C3E50" Padding="20,10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🎮 VoiceMacro Pro" 
+                          FontSize="24" 
+                          FontWeight="Bold" 
+                          Foreground="White" 
+                          VerticalAlignment="Center"/>
+                <TextBlock Text="매크로 관리 시스템" 
+                          FontSize="16" 
+                          Foreground="#BDC3C7" 
+                          VerticalAlignment="Center" 
+                          Margin="20,0,0,0"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 메인 콘텐츠 영역 -->
+        <TabControl Grid.Row="1" Background="#ECF0F1" Margin="10">
+            
+            <!-- 매크로 관리 탭 -->
+            <TabItem Header="📋 매크로 관리" FontSize="14" Padding="15,10">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 검색 및 필터 영역 -->
+                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 검색 박스 -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="🔍 검색:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBox Name="SearchTextBox" 
+                                        Width="300" 
+                                        Height="30" 
+                                        VerticalContentAlignment="Center"
+                                        Text="{Binding SearchTerm, UpdateSourceTrigger=PropertyChanged}"
+                                        FontSize="14"/>
+                                <Button Name="SearchButton" 
+                                       Content="검색" 
+                                       Margin="10,0,0,0" 
+                                       Padding="15,5" 
+                                       Background="#3498DB" 
+                                       Foreground="White" 
+                                       BorderThickness="0"
+                                       Click="SearchButton_Click"/>
+                            </StackPanel>
+                            
+                            <!-- 정렬 옵션 -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0">
+                                <TextBlock Text="정렬:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox Name="SortComboBox" 
+                                         Width="120" 
+                                         Height="30"
+                                         SelectedIndex="0"
+                                         SelectionChanged="SortComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="이름순" Tag="name"/>
+                                    <ComboBoxItem Content="생성일순" Tag="created_at"/>
+                                    <ComboBoxItem Content="사용빈도순" Tag="usage_count"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <!-- 새로고침 버튼 -->
+                            <Button Grid.Column="2" 
+                                   Name="RefreshButton"
+                                   Content="🔄 새로고침" 
+                                   Margin="20,0,0,0" 
+                                   Padding="15,5" 
+                                   Background="#27AE60" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   Click="RefreshButton_Click"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 버튼 그룹 -->
+                    <Border Grid.Row="1" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button Name="AddMacroButton" 
+                                   Content="➕ 새 매크로 추가" 
+                                   Margin="0,0,10,0" 
+                                   Padding="15,8" 
+                                   Background="#2ECC71" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   FontWeight="Bold"
+                                   Click="AddMacroButton_Click"/>
+                            <Button Name="EditMacroButton" 
+                                   Content="✏️ 수정" 
+                                   Margin="0,0,10,0" 
+                                   Padding="15,8" 
+                                   Background="#F39C12" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   IsEnabled="False"
+                                   Click="EditMacroButton_Click"/>
+                            <Button Name="CopyMacroButton" 
+                                   Content="📋 복사" 
+                                   Margin="0,0,10,0" 
+                                   Padding="15,8" 
+                                   Background="#3498DB" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   IsEnabled="False"
+                                   Click="CopyMacroButton_Click"/>
+                            <Button Name="DeleteMacroButton" 
+                                   Content="🗑️ 삭제" 
+                                   Margin="0,0,10,0" 
+                                   Padding="15,8" 
+                                   Background="#E74C3C" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   IsEnabled="False"
+                                   Click="DeleteMacroButton_Click"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 매크로 목록 DataGrid -->
+                    <Border Grid.Row="2" Background="White" CornerRadius="5">
+                        <DataGrid Name="MacroDataGrid" 
+                                 AutoGenerateColumns="False"
+                                 CanUserAddRows="False"
+                                 CanUserDeleteRows="False"
+                                 CanUserResizeRows="False"
+                                 SelectionMode="Single"
+                                 GridLinesVisibility="Horizontal"
+                                 HeadersVisibility="Column"
+                                 AlternatingRowBackground="#F8F9FA"
+                                 RowBackground="White"
+                                 BorderThickness="0"
+                                 FontSize="12"
+                                 SelectionChanged="MacroDataGrid_SelectionChanged">
+                            
+                            <!-- 컬럼 정의 -->
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="ID" 
+                                                   Binding="{Binding Id}" 
+                                                   Width="60" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="매크로 이름" 
+                                                   Binding="{Binding Name}" 
+                                                   Width="200" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="음성 명령어" 
+                                                   Binding="{Binding VoiceCommand}" 
+                                                   Width="200" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="동작 설명" 
+                                                   Binding="{Binding KeySequence}" 
+                                                   Width="250" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="타입" 
+                                                   Binding="{Binding ActionType}" 
+                                                   Width="100" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="생성일" 
+                                                   Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd}}" 
+                                                   Width="100" 
+                                                   IsReadOnly="True"/>
+                                <DataGridTextColumn Header="사용 횟수" 
+                                                   Binding="{Binding UsageCount}" 
+                                                   Width="100" 
+                                                   IsReadOnly="True"/>
+                            </DataGrid.Columns>
+                            
+                            <!-- 행 스타일 -->
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Setter Property="Height" Value="35"/>
+                                    <Style.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#E8F6F3"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter Property="Background" Value="#3498DB"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
+                            
+                            <!-- 헤더 스타일 -->
+                            <DataGrid.ColumnHeaderStyle>
+                                <Style TargetType="DataGridColumnHeader">
+                                    <Setter Property="Background" Value="#34495E"/>
+                                    <Setter Property="Foreground" Value="White"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Padding" Value="10,8"/>
+                                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                                    <Setter Property="BorderBrush" Value="#2C3E50"/>
+                                </Style>
+                            </DataGrid.ColumnHeaderStyle>
+                        </DataGrid>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
+            <!-- 향후 추가될 다른 탭들 -->
+            <TabItem Header="🎤 음성 인식" FontSize="14" Padding="15,10">
+                <Grid>
+                    <TextBlock Text="음성 인식 기능 (추후 구현 예정)" 
+                              HorizontalAlignment="Center" 
+                              VerticalAlignment="Center" 
+                              FontSize="16" 
+                              Foreground="#7F8C8D"/>
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="⚙️ 매크로 설정" FontSize="14" Padding="15,10">
+                <Grid>
+                    <TextBlock Text="매크로 설정 기능 (추후 구현 예정)" 
+                              HorizontalAlignment="Center" 
+                              VerticalAlignment="Center" 
+                              FontSize="16" 
+                              Foreground="#7F8C8D"/>
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="📁 프리셋 관리" FontSize="14" Padding="15,10">
+                <Grid>
+                    <TextBlock Text="프리셋 관리 기능 (추후 구현 예정)" 
+                              HorizontalAlignment="Center" 
+                              VerticalAlignment="Center" 
+                              FontSize="16" 
+                              Foreground="#7F8C8D"/>
+                </Grid>
+            </TabItem>
+            
+            <TabItem Header="📊 로그 및 모니터링" FontSize="14" Padding="15,10">
+                <Grid>
+                    <TextBlock Text="로그 및 모니터링 기능 (추후 구현 예정)" 
+                              HorizontalAlignment="Center" 
+                              VerticalAlignment="Center" 
+                              FontSize="16" 
+                              Foreground="#7F8C8D"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+        
+        <!-- 하단 상태 표시줄 -->
+        <Border Grid.Row="2" Background="#34495E" Padding="15,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Name="StatusTextBlock" 
+                          Grid.Column="0"
+                          Text="준비" 
+                          Foreground="White" 
+                          VerticalAlignment="Center"/>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Ellipse Name="ServerStatusIndicator" 
+                            Width="12" 
+                            Height="12" 
+                            Fill="Red" 
+                            Margin="0,0,8,0"/>
+                    <TextBlock Name="ServerStatusText" 
+                              Text="서버 연결 확인 중..." 
+                              Foreground="White" 
+                              VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window> 
