@@ -36,7 +36,7 @@ namespace VoiceMacroPro.Services
         /// <param name="searchTerm">검색어 (선택사항)</param>
         /// <param name="sortBy">정렬 기준 (name, created_at, usage_count)</param>
         /// <returns>매크로 목록</returns>
-        public async Task<List<Macro>> GetMacrosAsync(string searchTerm = null, string sortBy = "name")
+        public async Task<List<Macro>> GetMacrosAsync(string? searchTerm = null, string sortBy = "name")
         {
             try
             {
@@ -232,6 +232,35 @@ namespace VoiceMacroPro.Services
             catch (Exception ex)
             {
                 throw new Exception($"매크로 삭제 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로를 실행하는 함수
+        /// </summary>
+        /// <param name="macroId">실행할 매크로 ID</param>
+        /// <returns>실행 성공 여부</returns>
+        public async Task<bool> ExecuteMacroAsync(int macroId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/macros/{macroId}/execute";
+                var response = await _httpClient.PostAsync(url, null);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
+                    return apiResponse?.Success ?? false;
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"매크로 실행 중 오류 발생: {ex.Message}");
             }
         }
 

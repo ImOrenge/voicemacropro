@@ -16,7 +16,7 @@ namespace VoiceMacroPro.Views
         /// <summary>
         /// 편집 완료 후 반환할 매크로 객체
         /// </summary>
-        public Macro MacroResult { get; private set; }
+        public Macro MacroResult { get; private set; } = new Macro();
 
         /// <summary>
         /// 편집 모드 여부 (true: 수정, false: 새로 생성)
@@ -31,6 +31,10 @@ namespace VoiceMacroPro.Views
             InitializeComponent();
             _isEditMode = false;
             TitleTextBlock.Text = "새 매크로 추가";
+            
+            // 새 매크로용 MacroResult 초기화
+            MacroResult = new Macro();
+            
             InitializeDefaultValues();
         }
 

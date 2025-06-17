@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from macro_service import macro_service
-from voice_recognition_service import get_voice_recognition_service
+from voice_recognition_service_basic import get_voice_recognition_service_basic
 import json
 
 # Flask 애플리케이션 초기화
@@ -221,7 +222,6 @@ def delete_macro(macro_id):
         JSON: 삭제 결과
     """
     try:
-        # 매크로 삭제
         success = macro_service.delete_macro(macro_id)
         
         if success:
@@ -251,23 +251,30 @@ def increment_usage(macro_id):
         macro_id (int): 사용된 매크로 ID
         
     Returns:
-        JSON: 처리 결과
+        JSON: 업데이트 결과
     """
     try:
-        macro_service.increment_usage_count(macro_id)
-        return jsonify({
-            'success': True,
-            'message': '사용 횟수가 증가되었습니다'
-        }), 200
+        success = macro_service.increment_usage_count(macro_id)
         
+        if success:
+            return jsonify({
+                'success': True,
+                'message': '사용 횟수가 업데이트되었습니다'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': '매크로를 찾을 수 없습니다'
+            }), 404
+            
     except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e),
-            'message': '사용 횟수 증가 실패'
+            'message': '사용 횟수 업데이트 실패'
         }), 500
 
-# ========== 음성 인식 관련 API 엔드포인트 ==========
+# ========== 음성 인식 관련 API 엔드포인트==========
 
 @app.route('/api/voice/devices', methods=['GET'])
 def get_voice_devices():
@@ -278,7 +285,7 @@ def get_voice_devices():
         JSON: 마이크 장치 목록
     """
     try:
-        voice_service = get_voice_recognition_service()
+        voice_service = get_voice_recognition_service_basic()
         devices = voice_service.get_available_devices()
         
         return jsonify({
@@ -315,7 +322,7 @@ def set_voice_device():
                 'message': 'device_id가 필요합니다'
             }), 400
         
-        voice_service = get_voice_recognition_service()
+        voice_service = get_voice_recognition_service_basic()
         success = voice_service.set_device(device_id)
         
         if success:
@@ -345,7 +352,7 @@ def start_voice_recording():
         JSON: 녹음 시작 결과
     """
     try:
-        voice_service = get_voice_recognition_service()
+        voice_service = get_voice_recognition_service_basic()
         success = voice_service.start_recording()
         
         if success:
@@ -375,7 +382,7 @@ def stop_voice_recording():
         JSON: 녹음 중지 결과
     """
     try:
-        voice_service = get_voice_recognition_service()
+        voice_service = get_voice_recognition_service_basic()
         success = voice_service.stop_recording()
         
         if success:
@@ -405,7 +412,7 @@ def get_voice_status():
         JSON: 녹음 상태 정보
     """
     try:
-        voice_service = get_voice_recognition_service()
+        voice_service = get_voice_recognition_service_basic()
         status = voice_service.get_recording_status()
         
         return jsonify({
@@ -430,7 +437,7 @@ def test_microphone():
         JSON: 테스트 결과
     """
     try:
-        voice_service = get_voice_recognition_service()
+        voice_service = get_voice_recognition_service_basic()
         test_result = voice_service.test_microphone()
         
         return jsonify({

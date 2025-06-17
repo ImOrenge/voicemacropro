@@ -218,6 +218,291 @@
                 </Grid>
             </TabItem>
             
+            <!-- PRD 3.2.3 음성 인식 시스템 -->
+            <TabItem Header="🎤 음성 인식" FontSize="14" Padding="15,10">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 음성 입력 상태 표시 -->
+                    <Border Grid.Row="0" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 마이크 레벨 게이지 -->
+                            <StackPanel Grid.Column="0" Margin="0,0,20,0">
+                                <TextBlock Text="🎤 마이크 레벨" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <ProgressBar Name="MicLevelProgressBar" 
+                                           Height="25" 
+                                           Background="#E9ECEF"
+                                           Foreground="#28A745"
+                                           Minimum="0" 
+                                           Maximum="1"
+                                           Value="0"/>
+                                <TextBlock Name="MicLevelTextBlock" 
+                                          Text="0%" 
+                                          HorizontalAlignment="Center" 
+                                          FontSize="12" 
+                                          Margin="0,5,0,0"/>
+                            </StackPanel>
+                            
+                            <!-- 녹음 상태 표시 -->
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="20,0">
+                                <TextBlock Text="📡 녹음 상태" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <Ellipse Name="RecordingStatusIndicator" 
+                                        Width="50" 
+                                        Height="50" 
+                                        Fill="#DC3545"
+                                        HorizontalAlignment="Center"/>
+                                <TextBlock Name="RecordingStatusText" 
+                                          Text="중지" 
+                                          HorizontalAlignment="Center" 
+                                          FontSize="12" 
+                                          FontWeight="Bold"
+                                          Margin="0,5,0,0"/>
+                                
+                                <!-- 녹음 제어 버튼 -->
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                                    <Button Name="StartRecordingButton"
+                                           Content="🎤 녹음 시작" 
+                                           Padding="15,8" 
+                                           Background="#28A745" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           Margin="0,0,10,0"
+                                           Click="StartRecordingButton_Click"/>
+                                    <Button Name="StopRecordingButton"
+                                           Content="⏹️ 녹음 중지" 
+                                           Padding="15,8" 
+                                           Background="#DC3545" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           IsEnabled="False"
+                                           Click="StopRecordingButton_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                            
+                            <!-- 인식된 텍스트 표시창 -->
+                            <StackPanel Grid.Column="2" Margin="20,0,0,0">
+                                <TextBlock Text="💬 인식된 텍스트" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <Border Background="#F8F9FA" 
+                                       BorderBrush="#DEE2E6" 
+                                       BorderThickness="1" 
+                                       CornerRadius="5" 
+                                       Height="80">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <TextBlock Name="RecognizedTextBlock" 
+                                                  Text="음성 인식을 시작하세요..." 
+                                                  TextWrapping="Wrap" 
+                                                  Margin="10"
+                                                  FontSize="14"
+                                                  Foreground="#6C757D"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 설정 그룹 -->
+                    <Border Grid.Row="1" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 마이크 선택 -->
+                            <StackPanel Grid.Column="0" Margin="0,0,20,0">
+                                <TextBlock Text="🎙️ 마이크 선택" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <ComboBox Name="MicrophoneComboBox" 
+                                         Height="35"
+                                         FontSize="12"
+                                         SelectionChanged="MicrophoneComboBox_SelectionChanged"/>
+                            </StackPanel>
+                            
+                            <!-- 감도 조절 -->
+                            <StackPanel Grid.Column="1" Margin="0,0,20,0">
+                                <TextBlock Text="📊 감도 조절" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Name="SensitivitySlider" 
+                                           Grid.Column="0"
+                                           Height="35"
+                                           Minimum="0.1" 
+                                           Maximum="2.0" 
+                                           Value="1.0"
+                                           TickFrequency="0.1"
+                                           ValueChanged="SensitivitySlider_ValueChanged"/>
+                                    <TextBlock Grid.Column="1" 
+                                              Name="SensitivityValueText"
+                                              Text="1.0x" 
+                                              VerticalAlignment="Center" 
+                                              Margin="10,0,0,0"
+                                              FontWeight="Bold"/>
+                                </Grid>
+                            </StackPanel>
+                            
+                            <!-- 언어 선택 -->
+                            <StackPanel Grid.Column="2" Margin="0,0,20,0">
+                                <TextBlock Text="🌐 언어 선택" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <ComboBox Name="LanguageComboBox" 
+                                         Height="35"
+                                         FontSize="12"
+                                         SelectedIndex="0"
+                                         SelectionChanged="LanguageComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="한국어 (ko)" Tag="ko"/>
+                                    <ComboBoxItem Content="English (en)" Tag="en"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <!-- 마이크 테스트 버튼 -->
+                            <StackPanel Grid.Column="3">
+                                <TextBlock Text="🔧 테스트" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                                <Button Name="TestMicrophoneButton"
+                                       Content="🧪 마이크 테스트" 
+                                       Padding="15,8" 
+                                       Background="#17A2B8" 
+                                       Foreground="White" 
+                                       BorderThickness="0"
+                                       Click="TestMicrophoneButton_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 매칭 결과 표시 -->
+                    <Border Grid.Row="2" Background="White" Padding="15" CornerRadius="8">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- 매칭 결과 헤더 -->
+                            <TextBlock Grid.Row="0" 
+                                      Text="🎯 매칭된 매크로 목록" 
+                                      FontWeight="Bold" 
+                                      FontSize="16" 
+                                      Margin="0,0,0,15"/>
+                            
+                            <!-- 매칭 결과 DataGrid -->
+                            <DataGrid Grid.Row="1"
+                                     Name="MatchedMacrosDataGrid" 
+                                     AutoGenerateColumns="False"
+                                     CanUserAddRows="False"
+                                     CanUserDeleteRows="False"
+                                     CanUserResizeRows="False"
+                                     SelectionMode="Single"
+                                     GridLinesVisibility="Horizontal"
+                                     HeadersVisibility="Column"
+                                     AlternatingRowBackground="#F8F9FA"
+                                     RowBackground="White"
+                                     BorderThickness="1"
+                                     BorderBrush="#DEE2E6"
+                                     FontSize="12"
+                                     MouseDoubleClick="MatchedMacrosDataGrid_MouseDoubleClick">
+                                
+                                <!-- 매칭 결과 컬럼 정의 -->
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="순위" 
+                                                       Binding="{Binding Rank}" 
+                                                       Width="60" 
+                                                       IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    
+                                    <DataGridTextColumn Header="매크로 이름" 
+                                                       Binding="{Binding MacroName}" 
+                                                       Width="200" 
+                                                       IsReadOnly="True"/>
+                                    
+                                    <DataGridTextColumn Header="음성 명령어" 
+                                                       Binding="{Binding VoiceCommand}" 
+                                                       Width="200" 
+                                                       IsReadOnly="True"/>
+                                    
+                                    <DataGridTextColumn Header="확신도" 
+                                                       Binding="{Binding ConfidenceText}" 
+                                                       Width="100" 
+                                                       IsReadOnly="True">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                                <Setter Property="Foreground" Value="{Binding ConfidenceColor}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    
+                                    <DataGridTextColumn Header="동작 설명" 
+                                                       Binding="{Binding ActionDescription}" 
+                                                       Width="*" 
+                                                       IsReadOnly="True"/>
+                                    
+                                    <DataGridTemplateColumn Header="실행" Width="80">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Button Content="▶️" 
+                                                       Padding="5" 
+                                                       Background="#28A745" 
+                                                       Foreground="White" 
+                                                       BorderThickness="0"
+                                                       Click="ExecuteMacroButton_Click"
+                                                       Tag="{Binding MacroId}"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                                
+                                <!-- 행 스타일 -->
+                                <DataGrid.RowStyle>
+                                    <Style TargetType="DataGridRow">
+                                        <Setter Property="Height" Value="40"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#E8F5E8"/>
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Background" Value="#28A745"/>
+                                                <Setter Property="Foreground" Value="White"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGrid.RowStyle>
+                                
+                                <!-- 헤더 스타일 -->
+                                <DataGrid.ColumnHeaderStyle>
+                                    <Style TargetType="DataGridColumnHeader">
+                                        <Setter Property="Background" Value="#198754"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Padding" Value="10,8"/>
+                                        <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                                        <Setter Property="BorderBrush" Value="#146C43"/>
+                                    </Style>
+                                </DataGrid.ColumnHeaderStyle>
+                            </DataGrid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
             <!-- PRD 3.5 로그 및 모니터링 시스템 -->
             <TabItem Header="📊 로그 및 모니터링" FontSize="14" Padding="15,10">
                 <Grid Margin="10">

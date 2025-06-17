@@ -1,8 +1,60 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace VoiceMacroPro.Models
 {
+    /// <summary>
+    /// Dictionary<string, object> Settings 필드를 위한 커스텀 JSON 컨버터
+    /// 백엔드에서 JSON 문자열로 전송되는 settings를 딕셔너리로 변환합니다.
+    /// </summary>
+    public class SettingsJsonConverter : JsonConverter<Dictionary<string, object>>
+    {
+        public override Dictionary<string, object> ReadJson(JsonReader reader, Type objectType, Dictionary<string, object>? existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            try
+            {
+                if (reader.TokenType == JsonToken.Null)
+                {
+                    return new Dictionary<string, object>();
+                }
+
+                if (reader.TokenType == JsonToken.String)
+                {
+                    // JSON 문자열인 경우 파싱
+                    var jsonString = reader.Value?.ToString();
+                    if (string.IsNullOrWhiteSpace(jsonString))
+                    {
+                        return new Dictionary<string, object>();
+                    }
+
+                    var result = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                    return result ?? new Dictionary<string, object>();
+                }
+
+                if (reader.TokenType == JsonToken.StartObject)
+                {
+                    // 이미 객체인 경우 직접 역직렬화
+                    var result = serializer.Deserialize<Dictionary<string, object>>(reader);
+                    return result ?? new Dictionary<string, object>();
+                }
+
+                return new Dictionary<string, object>();
+            }
+            catch (Exception)
+            {
+                // 파싱 실패 시 빈 딕셔너리 반환
+                return new Dictionary<string, object>();
+            }
+        }
+
+        public override void WriteJson(JsonWriter writer, Dictionary<string, object>? value, JsonSerializer serializer)
+        {
+            // 쓰기 시에는 기본 직렬화 사용
+            serializer.Serialize(writer, value);
+        }
+    }
+
     /// <summary>
     /// 매크로 정보를 저장하는 데이터 모델 클래스
     /// 데이터베이스의 매크로 테이블과 대응됩니다.
@@ -36,7 +88,9 @@ namespace VoiceMacroPro.Models
 
         /// <summary>
         /// 추가 설정 정보 (딕셔너리 형태)
+        /// 백엔드에서 JSON 문자열로 전송될 수 있어 커스텀 컨버터 사용
         /// </summary>
+        [JsonConverter(typeof(SettingsJsonConverter))]
         public Dictionary<string, object> Settings { get; set; } = new Dictionary<string, object>();
 
         /// <summary>

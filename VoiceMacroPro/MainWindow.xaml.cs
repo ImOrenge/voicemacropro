@@ -22,10 +22,16 @@ namespace VoiceMacroPro
     {
         private readonly ApiService _apiService;
         private readonly LoggingService _loggingService;
+        private readonly VoiceRecognitionWrapperService _voiceService;
         private List<Macro> _allMacros = new List<Macro>();
         private string _currentSearchTerm = string.Empty;
         private string _currentSortBy = "name";
         private CollectionViewSource? _logViewSource;
+        
+        // 음성 인식 관련 필드
+        private List<VoiceMatchResult> _currentMatchResults = new List<VoiceMatchResult>();
+        private bool _isRecording = false;
+        private System.Windows.Threading.DispatcherTimer? _statusUpdateTimer;
 
         /// <summary>
         /// 메인 윈도우 생성자
@@ -36,25 +42,40 @@ namespace VoiceMacroPro
             try
             {
                 System.Diagnostics.Debug.WriteLine("MainWindow 생성자 시작");
+                Console.WriteLine("MainWindow 생성자 시작");
                 
                 InitializeComponent();
                 System.Diagnostics.Debug.WriteLine("InitializeComponent 완료");
+                Console.WriteLine("InitializeComponent 완료");
                 
                 _apiService = new ApiService();
                 System.Diagnostics.Debug.WriteLine("ApiService 초기화 완료");
+                Console.WriteLine("ApiService 초기화 완료");
                 
                 // 로깅 서비스 초기화
                 _loggingService = LoggingService.Instance;
+                System.Diagnostics.Debug.WriteLine("LoggingService 인스턴스 획득 완료");
+                Console.WriteLine("LoggingService 인스턴스 획득 완료");
+                
                 InitializeLoggingUI();
-                System.Diagnostics.Debug.WriteLine("LoggingService 초기화 완료");
+                System.Diagnostics.Debug.WriteLine("LoggingService UI 초기화 완료");
+                Console.WriteLine("LoggingService UI 초기화 완료");
+                
+                // 음성 인식 서비스 초기화
+                _voiceService = new VoiceRecognitionWrapperService();
+                System.Diagnostics.Debug.WriteLine("VoiceRecognitionService 초기화 완료");
+                Console.WriteLine("VoiceRecognitionService 초기화 완료");
                 
                 // 윈도우가 로드된 후 초기화 작업 수행
                 Loaded += MainWindow_Loaded;
                 System.Diagnostics.Debug.WriteLine("MainWindow 생성자 완료");
+                Console.WriteLine("MainWindow 생성자 완료");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"MainWindow 생성자 오류: {ex}");
+                var errorMsg = $"MainWindow 생성자 오류: {ex.Message}\n\n스택 트레이스:\n{ex.StackTrace}";
+                System.Diagnostics.Debug.WriteLine(errorMsg);
+                Console.WriteLine(errorMsg);
                 MessageBox.Show($"MainWindow 초기화 중 오류가 발생했습니다:\n{ex.Message}\n\n스택 트레이스:\n{ex.StackTrace}", 
                               "초기화 오류", MessageBoxButton.OK, MessageBoxImage.Error);
                 throw;
@@ -82,6 +103,10 @@ namespace VoiceMacroPro
                 // 매크로 목록 로드
                 await LoadMacros();
                 System.Diagnostics.Debug.WriteLine("매크로 로드 완료");
+                
+                // 음성 인식 UI 초기화 (UI 요소들이 모두 로드된 후)
+                InitializeVoiceRecognitionUI();
+                System.Diagnostics.Debug.WriteLine("음성 인식 UI 초기화 완료");
                 
                 UpdateStatusText("준비 완료");
                 _loggingService.LogInfo("애플리케이션 초기화가 완료되었습니다.");
@@ -587,17 +612,568 @@ namespace VoiceMacroPro
         }
 
         /// <summary>
+        /// 음성 인식 UI 초기화
+        /// </summary>
+        private void InitializeVoiceRecognitionUI()
+        {
+            try
+            {
+                // 매칭 결과 DataGrid 초기화
+                if (MatchedMacrosDataGrid != null)
+                {
+                    MatchedMacrosDataGrid.ItemsSource = _currentMatchResults;
+                }
+                
+                // 상태 업데이트 타이머 설정 (1초마다)
+                _statusUpdateTimer = new System.Windows.Threading.DispatcherTimer();
+                _statusUpdateTimer.Interval = TimeSpan.FromSeconds(1);
+                _statusUpdateTimer.Tick += StatusUpdateTimer_Tick;
+                _statusUpdateTimer.Start();
+                
+                // 초기 UI 상태 설정
+                UpdateRecordingUI();
+                
+                // 마이크 장치 목록 로드 (비동기적으로)
+                Task.Run(async () => 
+                {
+                    try
+                    {
+                        await LoadMicrophoneDevices();
+                    }
+                    catch (Exception ex)
+                    {
+                        _loggingService.LogError($"마이크 장치 로드 중 오류: {ex.Message}");
+                    }
+                });
+                
+                _loggingService.LogInfo("음성 인식 UI 초기화 완료");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"음성 인식 UI 초기화 중 오류: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"음성 인식 UI 초기화 오류: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 마이크 장치 목록을 로드하여 ComboBox에 표시
+        /// </summary>
+        private async Task LoadMicrophoneDevices()
+        {
+            try
+            {
+                var devices = await _voiceService.GetAvailableDevicesAsync();
+                
+                // UI 스레드에서 ComboBox 업데이트
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    if (MicrophoneComboBox != null)
+                    {
+                        MicrophoneComboBox.Items.Clear();
+                        
+                        foreach (var device in devices)
+                        {
+                            var item = new ComboBoxItem
+                            {
+                                Content = device.Name,
+                                Tag = device.Id
+                            };
+                            MicrophoneComboBox.Items.Add(item);
+                        }
+                        
+                        // 첫 번째 장치를 기본으로 선택
+                        if (devices.Count > 0)
+                        {
+                            MicrophoneComboBox.SelectedIndex = 0;
+                        }
+                    }
+                });
+                
+                _loggingService.LogInfo($"마이크 장치 목록 로드 완료: {devices.Count}개 장치");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"마이크 장치 목록 로드 중 오류: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"마이크 장치 로드 오류: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// 상태 업데이트 타이머 이벤트 핸들러
+        /// </summary>
+        private async void StatusUpdateTimer_Tick(object? sender, EventArgs e)
+        {
+            try
+            {
+                var status = await _voiceService.GetRecordingStatusAsync();
+                
+                if (status != null)
+                {
+                    // 마이크 레벨 업데이트
+                    if (MicLevelProgressBar != null)
+                    {
+                        MicLevelProgressBar.Value = status.AudioLevel;
+                    }
+                    
+                    if (MicLevelTextBlock != null)
+                    {
+                        MicLevelTextBlock.Text = $"{status.AudioLevel * 100:F0}%";
+                    }
+                    
+                    // 녹음 상태 업데이트
+                    _isRecording = status.IsRecording;
+                    UpdateRecordingUI();
+                }
+            }
+            catch (Exception ex)
+            {
+                // 타이머에서는 에러를 조용히 처리
+                System.Diagnostics.Debug.WriteLine($"상태 업데이트 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 녹음 상태에 따라 UI를 업데이트
+        /// </summary>
+        private void UpdateRecordingUI()
+        {
+            try
+            {
+                if (RecordingStatusIndicator != null)
+                {
+                    RecordingStatusIndicator.Fill = _isRecording ? 
+                        new SolidColorBrush(Colors.Green) : 
+                        new SolidColorBrush(Colors.Red);
+                }
+                
+                if (RecordingStatusText != null)
+                {
+                    RecordingStatusText.Text = _isRecording ? "녹음 중" : "중지";
+                }
+                
+                if (StartRecordingButton != null)
+                {
+                    StartRecordingButton.IsEnabled = !_isRecording;
+                }
+                
+                if (StopRecordingButton != null)
+                {
+                    StopRecordingButton.IsEnabled = _isRecording;
+                }
+                
+                // 초기 텍스트 설정
+                if (!_isRecording && RecognizedTextBlock != null && string.IsNullOrEmpty(RecognizedTextBlock.Text))
+                {
+                    RecognizedTextBlock.Text = "음성 인식을 시작하세요...";
+                    RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UI 업데이트 오류: {ex.Message}");
+            }
+        }
+
+        #region 음성 인식 이벤트 핸들러들
+
+        /// <summary>
+        /// 녹음 시작 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void StartRecordingButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var success = await _voiceService.StartRecordingAsync();
+                
+                if (success)
+                {
+                    _isRecording = true;
+                    UpdateRecordingUI();
+                    
+                    if (RecognizedTextBlock != null)
+                    {
+                        RecognizedTextBlock.Text = "음성을 인식하고 있습니다...";
+                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Blue);
+                    }
+                    
+                    _loggingService.LogInfo("음성 녹음이 시작되었습니다.");
+                    
+                    // 2초 후 자동으로 음성 분석 시작
+                    await Task.Delay(2000);
+                    if (_isRecording)
+                    {
+                        await AnalyzeVoiceAndShowResults();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("음성 녹음을 시작할 수 없습니다.", "오류", 
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"녹음 시작 중 오류: {ex.Message}");
+                MessageBox.Show($"녹음 시작 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 녹음 중지 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void StopRecordingButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var success = await _voiceService.StopRecordingAsync();
+                
+                if (success)
+                {
+                    _isRecording = false;
+                    UpdateRecordingUI();
+                    
+                    if (RecognizedTextBlock != null)
+                    {
+                        RecognizedTextBlock.Text = "음성 인식을 시작하세요...";
+                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+                    }
+                    
+                    _loggingService.LogInfo("음성 녹음이 중지되었습니다.");
+                }
+                else
+                {
+                    MessageBox.Show("음성 녹음을 중지할 수 없습니다.", "오류", 
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"녹음 중지 중 오류: {ex.Message}");
+                MessageBox.Show($"녹음 중지 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 마이크 선택 변경 이벤트 핸들러
+        /// </summary>
+        private async void MicrophoneComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                // 서비스들이 초기화된 경우에만 처리
+                if (_voiceService != null && _loggingService != null && 
+                    MicrophoneComboBox?.SelectedItem is ComboBoxItem selectedItem && 
+                    selectedItem.Tag is int deviceId)
+                {
+                    var success = await _voiceService.SetMicrophoneDeviceAsync(deviceId);
+                    
+                    if (success)
+                    {
+                        _loggingService.LogInfo($"마이크 장치 변경: {selectedItem.Content}");
+                    }
+                    else
+                    {
+                        _loggingService.LogWarning($"마이크 장치 변경 실패: {selectedItem.Content}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_loggingService != null)
+                {
+                    _loggingService.LogError($"마이크 장치 변경 중 오류: {ex.Message}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"마이크 장치 변경 중 오류 (초기화 전): {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 감도 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void SensitivitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            try
+            {
+                // UI 업데이트
+                if (SensitivityValueText != null)
+                {
+                    SensitivityValueText.Text = $"{e.NewValue:F1}x";
+                }
+                
+                // 로깅 서비스가 초기화된 경우에만 로그 기록
+                if (_loggingService != null)
+                {
+                    _loggingService.LogDebug($"마이크 감도 변경: {e.NewValue:F1}x");
+                }
+            }
+            catch (Exception ex)
+            {
+                // 로깅 서비스가 초기화된 경우에만 오류 로그 기록
+                if (_loggingService != null)
+                {
+                    _loggingService.LogError($"감도 설정 중 오류: {ex.Message}");
+                }
+                // 초기화되지 않은 경우 콘솔 출력
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"감도 설정 중 오류 (초기화 전): {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 언어 선택 변경 이벤트 핸들러
+        /// </summary>
+        private async void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                // 서비스들이 초기화된 경우에만 처리
+                if (_voiceService != null && _loggingService != null && 
+                    LanguageComboBox?.SelectedItem is ComboBoxItem selectedItem && 
+                    selectedItem.Tag is string language)
+                {
+                    var success = await _voiceService.SetLanguageAsync(language);
+                    
+                    if (success)
+                    {
+                        _loggingService.LogInfo($"언어 설정 변경: {language}");
+                    }
+                    else
+                    {
+                        _loggingService.LogWarning($"언어 설정 변경 실패: {language}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (_loggingService != null)
+                {
+                    _loggingService.LogError($"언어 설정 변경 중 오류: {ex.Message}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"언어 설정 변경 중 오류 (초기화 전): {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 마이크 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (TestMicrophoneButton != null)
+                {
+                    TestMicrophoneButton.IsEnabled = false;
+                    TestMicrophoneButton.Content = "🔄 테스트 중...";
+                }
+                
+                var result = await _voiceService.TestMicrophoneAsync();
+                
+                if (result != null)
+                {
+                    string message;
+                    if (result.Success)
+                    {
+                        message = "마이크 테스트 성공!\n\n" +
+                                $"• 장치 사용 가능: {(result.DeviceAvailable ? "✅" : "❌")}\n" +
+                                $"• 녹음 테스트: {(result.RecordingTest ? "✅" : "❌")}\n" +
+                                $"• 오디오 레벨 감지: {(result.AudioLevelDetected ? "✅" : "❌")}\n" +
+                                $"• 모드: {result.Mode}";
+                        
+                        MessageBox.Show(message, "마이크 테스트 완료", 
+                                      MessageBoxButton.OK, MessageBoxImage.Information);
+                        
+                        _loggingService.LogInfo("마이크 테스트 성공");
+                    }
+                    else
+                    {
+                        message = $"마이크 테스트 실패\n\n오류: {result.ErrorMessage}";
+                        MessageBox.Show(message, "마이크 테스트 실패", 
+                                      MessageBoxButton.OK, MessageBoxImage.Warning);
+                        
+                        _loggingService.LogWarning($"마이크 테스트 실패: {result.ErrorMessage}");
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("마이크 테스트를 수행할 수 없습니다.", "오류", 
+                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"마이크 테스트 중 오류: {ex.Message}");
+                MessageBox.Show($"마이크 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (TestMicrophoneButton != null)
+                {
+                    TestMicrophoneButton.IsEnabled = true;
+                    TestMicrophoneButton.Content = "🧪 마이크 테스트";
+                }
+            }
+        }
+
+        /// <summary>
+        /// 매칭된 매크로 DataGrid 더블클릭 이벤트 핸들러
+        /// </summary>
+        private async void MatchedMacrosDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            try
+            {
+                if (MatchedMacrosDataGrid?.SelectedItem is VoiceMatchResult selectedMatch)
+                {
+                    await ExecuteMacroById(selectedMatch.MacroId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 실행 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 실행 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void ExecuteMacroButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (sender is Button button && button.Tag is int macroId)
+                {
+                    await ExecuteMacroById(macroId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 실행 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 음성을 분석하고 매크로 매칭 결과를 표시
+        /// </summary>
+        private async Task AnalyzeVoiceAndShowResults()
+        {
+            try
+            {
+                if (RecognizedTextBlock != null)
+                {
+                    RecognizedTextBlock.Text = "음성을 분석 중입니다...";
+                    RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Orange);
+                }
+                
+                var matchResults = await _voiceService.AnalyzeVoiceAndMatchMacrosAsync(2.0);
+                
+                if (matchResults.Count > 0)
+                {
+                    _currentMatchResults.Clear();
+                    _currentMatchResults.AddRange(matchResults);
+                    
+                    // DataGrid 새로고침
+                    if (MatchedMacrosDataGrid != null)
+                    {
+                        MatchedMacrosDataGrid.Items.Refresh();
+                    }
+                    
+                    // 인식된 텍스트 표시 (첫 번째 결과의 음성 명령어 사용)
+                    if (RecognizedTextBlock != null && matchResults.Count > 0)
+                    {
+                        RecognizedTextBlock.Text = $"인식됨: \"{matchResults[0].VoiceCommand}\"";
+                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Green);
+                    }
+                    
+                    _loggingService.LogInfo($"매크로 매칭 완료: {matchResults.Count}개 결과");
+                }
+                else
+                {
+                    if (RecognizedTextBlock != null)
+                    {
+                        RecognizedTextBlock.Text = "매칭되는 매크로가 없습니다.";
+                        RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+                    }
+                    
+                    _loggingService.LogWarning("매크로 매칭 결과가 없습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (RecognizedTextBlock != null)
+                {
+                    RecognizedTextBlock.Text = "음성 분석 실패";
+                    RecognizedTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                }
+                
+                _loggingService.LogError($"음성 분석 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 ID로 매크로를 실행
+        /// </summary>
+        private async Task ExecuteMacroById(int macroId)
+        {
+            try
+            {
+                var success = await _apiService.ExecuteMacroAsync(macroId);
+                
+                if (success)
+                {
+                    _loggingService.LogInfo($"매크로 실행 성공: ID {macroId}");
+                    UpdateStatusText($"매크로 ID {macroId} 실행 완료");
+                }
+                else
+                {
+                    _loggingService.LogWarning($"매크로 실행 실패: ID {macroId}");
+                    MessageBox.Show($"매크로 실행에 실패했습니다. (ID: {macroId})", 
+                                  "실행 오류", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 실행 중 오류: {ex.Message}");
+                MessageBox.Show($"매크로 실행 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        #endregion
+
+        /// <summary>
         /// 윈도우가 닫힐 때 리소스를 정리하는 함수
         /// </summary>
         protected override void OnClosed(EventArgs e)
         {
-            // API 서비스 리소스 정리
-            _apiService?.Dispose();
-            
-            // 로깅 서비스 종료 로그
-            _loggingService?.LogInfo("애플리케이션이 종료됩니다.");
-            
-            base.OnClosed(e);
+            try
+            {
+                _loggingService.LogInfo("애플리케이션이 종료됩니다.");
+                
+                // 타이머 정리
+                _statusUpdateTimer?.Stop();
+                _statusUpdateTimer = null;
+                
+                // 리소스 정리
+                _logViewSource = null;
+                _voiceService?.Dispose();
+                _apiService?.Dispose();
+                
+                base.OnClosed(e);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"윈도우 종료 중 오류: {ex}");
+            }
         }
     }
 } 
