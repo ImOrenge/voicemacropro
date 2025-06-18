@@ -1067,158 +1067,144 @@ namespace VoiceMacroPro
             }
         }
 
+        /// <summary>
+        /// 감도 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
         private void SensitivitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            try
-            {
-                if (SensitivityValueText != null)
-                {
-                    SensitivityValueText.Text = $"{e.NewValue:F1}x";
-                }
-                _loggingService.LogDebug($"감도가 {e.NewValue:F1}x로 변경되었습니다");
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogWarning($"감도 변경 실패: {ex.Message}");
-            }
-        }
+            // 초기화 중에는 무시
+            if (SensitivityValueText == null || _loggingService == null)
+                return;
 
-        private async void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
             try
             {
-                if (LanguageComboBox?.SelectedItem is ComboBoxItem selectedItem)
-                {
-                    var language = selectedItem.Tag?.ToString() ?? "ko";
-                    _loggingService.LogInfo($"언어가 {language}로 변경되었습니다");
-                }
+                SensitivityValueText.Text = $"{e.NewValue:F1}x";
+                _loggingService.LogDebug($"음성 인식 감도 변경: {e.NewValue:F1}x");
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"언어 변경 실패: {ex.Message}");
-            }
-        }
-
-        private async void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                _loggingService.LogInfo("마이크 테스트를 시작합니다");
-                MessageBox.Show("마이크 테스트가 시작되었습니다.\n5초간 소리를 내보세요.", 
-                              "마이크 테스트", MessageBoxButton.OK, MessageBoxImage.Information);
-                
-                // 마이크 테스트 로직 (구현 필요)
-                await Task.Delay(5000);
-                
-                MessageBox.Show("마이크 테스트가 완료되었습니다.", 
-                              "마이크 테스트", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"마이크 테스트 실패: {ex.Message}");
-                MessageBox.Show($"마이크 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
-                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        private async void RefreshMicrophoneButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                await LoadMicrophoneDevices();
-                _loggingService.LogInfo("마이크 디바이스 목록이 새로고침되었습니다");
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"마이크 새로고침 실패: {ex.Message}");
-            }
-        }
-
-        private async void MatchedMacrosDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            try
-            {
-                if (MatchedMacrosDataGrid?.SelectedItem is VoiceMatchResult selectedResult)
-                {
-                    await ExecuteMacroById(selectedResult.MacroId);
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 실행 실패: {ex.Message}");
-            }
-        }
-
-        private async void ExecuteMacroButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (sender is Button button && button.Tag is int macroId)
-                {
-                    await ExecuteMacroById(macroId);
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 실행 실패: {ex.Message}");
-            }
-        }
-
-        private async Task ExecuteMacroById(int macroId)
-        {
-            try
-            {
-                _loggingService.LogInfo($"매크로 실행 시작: ID {macroId}");
-                
-                var result = await _apiService.ExecuteMacroAsync(macroId);
-                if (result)
-                {
-                    _loggingService.LogInfo($"매크로 실행 성공: ID {macroId}");
-                    UpdateStatusText("매크로 실행 완료");
-                }
-                else
-                {
-                    _loggingService.LogError($"매크로 실행 실패: ID {macroId}");
-                    UpdateStatusText("매크로 실행 실패");
-                }
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 실행 중 오류: {ex.Message}");
-                UpdateStatusText("매크로 실행 오류");
+                // 로깅 서비스가 없으면 콘솔에 출력
+                System.Diagnostics.Debug.WriteLine($"SensitivitySlider_ValueChanged 오류: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// 매크로 관련 데이터를 모든 관련 탭에서 새로고침하는 메서드
+        /// 콤보 기본 딜레이 슬라이더 값 변경 이벤트 핸들러
         /// </summary>
-        private async Task RefreshMacroRelatedData()
+        private void ComboDefaultDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            // 초기화 중에는 무시
+            if (ComboDefaultDelayText == null || _loggingService == null)
+                return;
+
             try
             {
-                _loggingService.LogDebug("매크로 관련 데이터 새로고침 시작");
-                
-                // 매크로 목록 새로고침
-                await LoadMacros();
-                
-                // 현재 선택된 프리셋의 미리보기 갱신
-                await UpdatePresetPreview();
-                
-                // 음성 인식 매칭 캐시 무효화 (새로운 매크로가 추가되었을 수 있음)
-                try
-                {
-                    await InvalidateVoiceMatchingCache();
-                }
-                catch (Exception ex)
-                {
-                    _loggingService.LogWarning($"음성 인식 매칭 캐시 무효화 중 오류 발생: {ex.Message}");
-                }
-                
-                _loggingService.LogDebug("매크로 관련 데이터 새로고침 완료");
+                ComboDefaultDelayText.Text = $"{(int)e.NewValue}ms";
+                _loggingService.LogDebug($"콤보 기본 딜레이 변경: {e.NewValue}ms");
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"매크로 관련 데이터 새로고침 실패: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"ComboDefaultDelaySlider_ValueChanged 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 연속 클릭 CPS 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RapidCpsSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 초기화 중에는 무시
+            if (RapidCpsText == null || _loggingService == null)
+                return;
+
+            try
+            {
+                RapidCpsText.Text = $"{e.NewValue:F1} CPS";
+                _loggingService.LogDebug($"연속 클릭 CPS 변경: {e.NewValue}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RapidCpsSlider_ValueChanged 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 연속 클릭 지속시간 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RapidDurationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 초기화 중에는 무시
+            if (RapidDurationText == null || _loggingService == null)
+                return;
+
+            try
+            {
+                RapidDurationText.Text = $"{e.NewValue:F1}초";
+                _loggingService.LogDebug($"연속 클릭 지속시간 변경: {e.NewValue}초");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RapidDurationSlider_ValueChanged 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 홀드 지속시간 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void HoldDurationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 초기화 중에는 무시
+            if (HoldDurationText == null || _loggingService == null)
+                return;
+
+            try
+            {
+                HoldDurationText.Text = $"{e.NewValue:F1}초";
+                _loggingService.LogDebug($"홀드 지속시간 변경: {e.NewValue}초");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"HoldDurationSlider_ValueChanged 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 반복 횟수 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RepeatCountSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 초기화 중에는 무시
+            if (RepeatCountText == null || _loggingService == null)
+                return;
+
+            try
+            {
+                RepeatCountText.Text = $"{(int)e.NewValue}회";
+                _loggingService.LogDebug($"반복 횟수 변경: {e.NewValue}회");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RepeatCountSlider_ValueChanged 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 반복 간격 슬라이더 값 변경 이벤트 핸들러
+        /// </summary>
+        private void RepeatIntervalSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            // 초기화 중에는 무시
+            if (RepeatIntervalText == null || _loggingService == null)
+                return;
+
+            try
+            {
+                RepeatIntervalText.Text = $"{e.NewValue:F1}초";
+                _loggingService.LogDebug($"반복 간격 변경: {e.NewValue}초");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"RepeatIntervalSlider_ValueChanged 오류: {ex.Message}");
             }
         }
 
@@ -1231,15 +1217,6 @@ namespace VoiceMacroPro
         {
             // 매크로 타입 변경시 처리 로직 (현재는 기본 구현)
             _loggingService.LogDebug("매크로 타입 변경됨");
-        }
-
-        /// <summary>
-        /// 콤보 기본 딜레이 슬라이더 값 변경 이벤트 핸들러
-        /// </summary>
-        private void ComboDefaultDelaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            // 콤보 딜레이 변경시 처리 로직
-            _loggingService.LogDebug($"콤보 기본 딜레이 변경: {e.NewValue}ms");
         }
 
         /// <summary>
@@ -1270,57 +1247,12 @@ namespace VoiceMacroPro
         }
 
         /// <summary>
-        /// 연속 클릭 CPS 슬라이더 값 변경 이벤트 핸들러
-        /// </summary>
-        private void RapidCpsSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            // 연속 클릭 CPS 변경시 처리 로직
-            _loggingService.LogDebug($"연속 클릭 CPS 변경: {e.NewValue}");
-        }
-
-        /// <summary>
-        /// 연속 클릭 지속시간 슬라이더 값 변경 이벤트 핸들러
-        /// </summary>
-        private void RapidDurationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            // 연속 클릭 지속시간 변경시 처리 로직
-            _loggingService.LogDebug($"연속 클릭 지속시간 변경: {e.NewValue}초");
-        }
-
-        /// <summary>
         /// 연속 클릭 테스트 버튼 클릭 이벤트 핸들러
         /// </summary>
         private void TestRapidButton_Click(object sender, RoutedEventArgs e)
         {
             // 연속 클릭 테스트 로직
             _loggingService.LogDebug("연속 클릭 테스트 버튼 클릭");
-        }
-
-        /// <summary>
-        /// 홀드 지속시간 슬라이더 값 변경 이벤트 핸들러
-        /// </summary>
-        private void HoldDurationSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            // 홀드 지속시간 변경시 처리 로직
-            _loggingService.LogDebug($"홀드 지속시간 변경: {e.NewValue}초");
-        }
-
-        /// <summary>
-        /// 홀드 고정 지속시간 체크박스 체크 이벤트 핸들러
-        /// </summary>
-        private void HoldUseFixedDurationCheckBox_Checked(object sender, RoutedEventArgs e)
-        {
-            // 홀드 고정 지속시간 체크시 처리 로직
-            _loggingService.LogDebug("홀드 고정 지속시간 체크됨");
-        }
-
-        /// <summary>
-        /// 홀드 고정 지속시간 체크박스 체크 해제 이벤트 핸들러
-        /// </summary>
-        private void HoldUseFixedDurationCheckBox_Unchecked(object sender, RoutedEventArgs e)
-        {
-            // 홀드 고정 지속시간 체크 해제시 처리 로직
-            _loggingService.LogDebug("홀드 고정 지속시간 체크 해제됨");
         }
 
         /// <summary>
@@ -1337,22 +1269,6 @@ namespace VoiceMacroPro
         private void TestToggleButton_Click(object sender, RoutedEventArgs e)
         {
             _loggingService.LogDebug("토글 테스트 버튼 클릭");
-        }
-
-        /// <summary>
-        /// 반복 횟수 슬라이더 값 변경 이벤트 핸들러
-        /// </summary>
-        private void RepeatCountSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            _loggingService.LogDebug($"반복 횟수 변경: {e.NewValue}회");
-        }
-
-        /// <summary>
-        /// 반복 간격 슬라이더 값 변경 이벤트 핸들러
-        /// </summary>
-        private void RepeatIntervalSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            _loggingService.LogDebug($"반복 간격 변경: {e.NewValue}초");
         }
 
         /// <summary>
@@ -1513,6 +1429,191 @@ namespace VoiceMacroPro
         private void QuickApplyButton_Click(object sender, RoutedEventArgs e)
         {
             _loggingService.LogDebug("빠른 적용 버튼 클릭");
+        }
+
+        /// <summary>
+        /// 매크로 관련 데이터를 모든 관련 탭에서 새로고침하는 메서드
+        /// </summary>
+        private async Task RefreshMacroRelatedData()
+        {
+            try
+            {
+                _loggingService.LogDebug("매크로 관련 데이터 새로고침 시작");
+                
+                // 매크로 목록 새로고침
+                await LoadMacros();
+                
+                // 현재 선택된 프리셋의 미리보기 갱신
+                await UpdatePresetPreview();
+                
+                // 음성 인식 매칭 캐시 무효화 (새로운 매크로가 추가되었을 수 있음)
+                try
+                {
+                    await InvalidateVoiceMatchingCache();
+                }
+                catch (Exception ex)
+                {
+                    _loggingService.LogWarning($"음성 인식 매칭 캐시 무효화 중 오류 발생: {ex.Message}");
+                }
+                
+                _loggingService.LogDebug("매크로 관련 데이터 새로고침 완료");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 관련 데이터 새로고침 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 언어 선택 콤보박스 변경 이벤트 핸들러
+        /// </summary>
+        private async void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loggingService == null) return;
+
+            try
+            {
+                if (LanguageComboBox?.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    var language = selectedItem.Tag?.ToString() ?? "ko";
+                    _loggingService.LogInfo($"언어가 {language}로 변경되었습니다");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"언어 변경 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 마이크 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loggingService == null) return;
+
+            try
+            {
+                _loggingService.LogInfo("마이크 테스트를 시작합니다");
+                MessageBox.Show("마이크 테스트가 시작되었습니다.\n5초간 소리를 내보세요.", 
+                              "마이크 테스트", MessageBoxButton.OK, MessageBoxImage.Information);
+                
+                // 마이크 테스트 로직 (구현 필요)
+                await Task.Delay(5000);
+                
+                MessageBox.Show("마이크 테스트가 완료되었습니다.", 
+                              "마이크 테스트", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"마이크 테스트 실패: {ex.Message}");
+                MessageBox.Show($"마이크 테스트 중 오류가 발생했습니다:\n{ex.Message}", 
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 마이크 새로고침 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void RefreshMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loggingService == null) return;
+
+            try
+            {
+                await LoadMicrophoneDevices();
+                _loggingService.LogInfo("마이크 디바이스 목록이 새로고침되었습니다");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"마이크 새로고침 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매칭 결과 더블클릭 이벤트 핸들러
+        /// </summary>
+        private async void MatchedMacrosDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (_loggingService == null) return;
+
+            try
+            {
+                if (MatchedMacrosDataGrid?.SelectedItem is VoiceMatchResult selectedResult)
+                {
+                    await ExecuteMacroById(selectedResult.MacroId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 실행 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 실행 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        private async void ExecuteMacroButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loggingService == null) return;
+
+            try
+            {
+                if (sender is Button button && button.Tag is int macroId)
+                {
+                    await ExecuteMacroById(macroId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 실행 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 매크로 ID로 매크로 실행
+        /// </summary>
+        private async Task ExecuteMacroById(int macroId)
+        {
+            try
+            {
+                _loggingService.LogInfo($"매크로 실행 시작: ID {macroId}");
+                
+                var result = await _apiService.ExecuteMacroAsync(macroId);
+                if (result)
+                {
+                    _loggingService.LogInfo($"매크로 실행 성공: ID {macroId}");
+                    UpdateStatusText("매크로 실행 완료");
+                }
+                else
+                {
+                    _loggingService.LogError($"매크로 실행 실패: ID {macroId}");
+                    UpdateStatusText("매크로 실행 실패");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 실행 중 오류: {ex.Message}");
+                UpdateStatusText("매크로 실행 오류");
+            }
+        }
+
+        /// <summary>
+        /// 홀드 고정 지속시간 체크박스 체크 이벤트 핸들러
+        /// </summary>
+        private void HoldUseFixedDurationCheckBox_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_loggingService == null) return;
+            _loggingService.LogDebug("홀드 고정 지속시간 체크됨");
+        }
+
+        /// <summary>
+        /// 홀드 고정 지속시간 체크박스 체크 해제 이벤트 핸들러
+        /// </summary>
+        private void HoldUseFixedDurationCheckBox_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_loggingService == null) return;
+            _loggingService.LogDebug("홀드 고정 지속시간 체크 해제됨");
         }
     }
 } 
