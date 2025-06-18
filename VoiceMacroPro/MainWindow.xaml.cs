@@ -864,6 +864,10 @@ namespace VoiceMacroPro
         
         private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // 초기화 중에는 무시
+            if (_loggingService == null)
+                return;
+
             try
             {
                 if (LogLevelComboBox?.SelectedItem is ComboBoxItem selectedItem)
@@ -871,54 +875,127 @@ namespace VoiceMacroPro
                     var selectedLevel = selectedItem.Tag?.ToString() ?? "Info";
                     _loggingService.SetMinimumLevel(selectedLevel);
                     _loggingService.LogInfo($"로그 레벨이 {selectedLevel}로 변경되었습니다");
+                    
+                    // 필터 적용
+                    ApplyLogFilter();
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"로그 레벨 변경 실패: {ex.Message}");
+                _loggingService?.LogError($"로그 레벨 변경 실패: {ex.Message}");
             }
         }
 
         private void LogFilterTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // 초기화 중에는 무시
+            if (_loggingService == null)
+                return;
+
             try
             {
+                ApplyLogFilter();
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogError($"로그 필터링 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 로그 필터를 적용하는 메서드
+        /// </summary>
+        private void ApplyLogFilter()
+        {
+            try
+            {
+                if (LogDataGrid?.ItemsSource is not ObservableCollection<LogEntry> logEntries)
+                    return;
+
                 var filterText = LogFilterTextBox?.Text?.Trim().ToLower() ?? "";
-                
-                if (_logViewSource?.View != null)
+                var currentLevel = (LogLevelComboBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Info";
+
+                // 컬렉션 뷰를 사용하여 필터링
+                var view = CollectionViewSource.GetDefaultView(logEntries);
+                if (view != null)
                 {
-                    if (string.IsNullOrEmpty(filterText))
+                    view.Filter = obj =>
                     {
-                        _logViewSource.View.Filter = null;
-                    }
-                    else
-                    {
-                        _logViewSource.View.Filter = obj =>
-                        {
-                            if (obj is LogEntry log)
-                            {
-                                return log.Message.ToLower().Contains(filterText) ||
-                                       log.LevelText.ToLower().Contains(filterText);
-                            }
+                        if (obj is not LogEntry log)
                             return false;
-                        };
-                    }
-                    _logViewSource.View.Refresh();
+
+                        // 레벨 필터 적용
+                        if (!PassesLevelFilter(log.LevelText, currentLevel))
+                            return false;
+
+                        // 텍스트 필터 적용
+                        if (!string.IsNullOrEmpty(filterText))
+                        {
+                            return log.Message.ToLower().Contains(filterText) ||
+                                   log.LevelText.ToLower().Contains(filterText);
+                        }
+
+                        return true;
+                    };
+                    view.Refresh();
                 }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"로그 필터링 실패: {ex.Message}");
+                _loggingService?.LogWarning($"로그 필터 적용 실패: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 로그 레벨 필터를 확인하는 메서드
+        /// </summary>
+        private static bool PassesLevelFilter(string logLevel, string minimumLevel)
+        {
+            var levels = new Dictionary<string, int>
+            {
+                { "Debug", 0 },
+                { "Info", 1 },
+                { "Warning", 2 },
+                { "Error", 3 }
+            };
+
+            if (!levels.TryGetValue(logLevel, out int logLevelValue))
+                logLevelValue = 1; // 기본값은 Info
+
+            if (!levels.TryGetValue(minimumLevel, out int minLevelValue))
+                minLevelValue = 1; // 기본값은 Info
+
+            return logLevelValue >= minLevelValue;
         }
 
         private void AutoScrollCheckBox_Checked(object sender, RoutedEventArgs e)
         {
+            // 초기화 중에는 무시
+            if (_loggingService == null)
+                return;
+
             _loggingService.SetAutoScroll(true);
+            
+            // 체크된 즉시 마지막 로그로 스크롤
+            try
+            {
+                if (LogDataGrid != null && _loggingService.LogEntries.Count > 0)
+                {
+                    LogDataGrid.ScrollIntoView(_loggingService.LogEntries.Last());
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService?.LogWarning($"자동 스크롤 활성화 실패: {ex.Message}");
+            }
         }
 
         private void AutoScrollCheckBox_Unchecked(object sender, RoutedEventArgs e)
         {
+            // 초기화 중에는 무시
+            if (_loggingService == null)
+                return;
+
             _loggingService.SetAutoScroll(false);
         }
 
@@ -1044,6 +1121,10 @@ namespace VoiceMacroPro
 
         private async void MicrophoneComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // 초기화 중에는 무시
+            if (_loggingService == null)
+                return;
+
             try
             {
                 if (MicrophoneComboBox?.SelectedItem != null)
@@ -1054,7 +1135,7 @@ namespace VoiceMacroPro
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"마이크 변경 실패: {ex.Message}");
+                _loggingService?.LogError($"마이크 변경 실패: {ex.Message}");
             }
         }
 
