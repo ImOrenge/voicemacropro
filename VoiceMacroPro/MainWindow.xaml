@@ -2,1916 +2,354 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="VoiceMacro Pro - 게임 AI 음성 매크로" 
-        Height="700" Width="1200"
-        WindowStartupLocation="CenterScreen">
+        Height="800" Width="1400"
+        WindowStartupLocation="CenterScreen"
+        Background="#F8F9FA">
     
     <!-- 메인 그리드 레이아웃 -->
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
         
-        <!-- 상단 제목 영역 -->
-        <Border Grid.Row="0" Background="#2C3E50" Padding="20,10">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="🎮 VoiceMacro Pro" 
-                          FontSize="24" 
-                          FontWeight="Bold" 
-                          Foreground="White" 
-                          VerticalAlignment="Center"/>
-                <TextBlock Text="매크로 관리 시스템" 
-                          FontSize="16" 
-                          Foreground="#BDC3C7" 
-                          VerticalAlignment="Center" 
-                          Margin="20,0,0,0"/>
-            </StackPanel>
+        <!-- 좌측 사이드바 -->
+        <Border Grid.Column="0" CornerRadius="0,10,10,0">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#4285F4" Offset="0"/>
+                    <GradientStop Color="#1E3A8A" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                
+                <!-- 사이드바 헤더 -->
+                <Border Grid.Row="0" Padding="25,30">
+                    <StackPanel>
+                        <TextBlock Text="🎮" 
+                                  FontSize="32" 
+                                  HorizontalAlignment="Center" 
+                                  Margin="0,0,0,10"/>
+                        <TextBlock Text="VoiceMacro" 
+                                  FontSize="20" 
+                                  FontWeight="Bold" 
+                                  Foreground="White" 
+                                  HorizontalAlignment="Center"
+                                  Margin="0,0,0,5"/>
+                        <TextBlock Text="Pro" 
+                                  FontSize="16" 
+                                  Foreground="#E8F0FE" 
+                                  HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                
+                <!-- 네비게이션 메뉴 -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" Padding="15,0">
+                    <StackPanel>
+                        <!-- 대시보드 메뉴 항목 -->
+                        <Button Name="DashboardMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📊" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="대시보드" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        
+                        <!-- 매크로 관리 메뉴 항목 -->
+                        <Button Name="MacroManagementMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection"
+                               Tag="MacroManagement">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📋" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="매크로 관리" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        
+                        <!-- 커스텀 스크립팅 메뉴 항목 -->
+                        <Button Name="CustomScriptingMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection"
+                               Tag="CustomScripting">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🔧" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="커스텀 스크립팅" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        
+                        <!-- 음성 인식 메뉴 항목 -->
+                        <Button Name="VoiceRecognitionMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection"
+                               Tag="VoiceRecognition">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="🎤" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="음성 인식" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        
+                        <!-- 로그 및 모니터링 메뉴 항목 -->
+                        <Button Name="LogMonitoringMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection"
+                               Tag="LogMonitoring">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📊" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="로그 및 모니터링" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        
+                        <!-- 프리셋 관리 메뉴 항목 -->
+                        <Button Name="PresetManagementMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection"
+                               Tag="PresetManagement">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📁" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="프리셋 관리" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                        
+                        <!-- 구분선 -->
+                        <Separator Margin="0,20" Background="#5A9BF8" Height="1"/>
+                        
+                        <!-- 개발자 정보 메뉴 항목 -->
+                        <Button Name="DeveloperInfoMenuButton" 
+                               Style="{StaticResource SidebarMenuButtonStyle}"
+                               Click="NavigateToSection"
+                               Tag="DeveloperInfo">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="💻" FontSize="18" Margin="0,0,15,0"/>
+                                <TextBlock Text="개발자 정보" FontSize="14" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+                
+                <!-- 사이드바 하단 -->
+                <Border Grid.Row="2" Padding="20" Background="#1A365D" CornerRadius="0,0,10,0">
+                    <StackPanel>
+                        <!-- 서버 연결 상태 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Ellipse Name="SidebarServerIndicator" 
+                                    Width="8" 
+                                    Height="8" 
+                                    Fill="#DC3545" 
+                                    Margin="0,0,8,0"/>
+                            <TextBlock Name="SidebarServerStatus" 
+                                      Text="서버 연결 확인 중..." 
+                                      FontSize="11" 
+                                      Foreground="#E8F0FE"/>
+                        </StackPanel>
+                        
+                        <!-- 버전 정보 -->
+                        <TextBlock Text="v1.0.0" 
+                                  FontSize="10" 
+                                  Foreground="#A0B4CC" 
+                                  HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
         
-        <!-- 메인 콘텐츠 영역 -->
-        <TabControl Name="MainTabControl" Grid.Row="1" Background="#ECF0F1" Margin="10">
+        <!-- 우측 메인 콘텐츠 영역 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
             
-            <!-- 매크로 관리 탭 -->
-            <TabItem Header="📋 매크로 관리" FontSize="14" Padding="15,10">
-                <Grid Margin="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+            <!-- 상단 헤더 -->
+            <Border Grid.Row="0" Background="White" Padding="30,20" Margin="15,15,15,0" CornerRadius="10">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Color="#E0E6ED" Opacity="0.3"/>
+                </Border.Effect>
+                
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
                     
-                    <!-- 검색 및 필터 영역 -->
-                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 검색 박스 -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <TextBlock Text="🔍 검색:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <TextBox Name="SearchTextBox" 
-                                        Width="300" 
-                                        Height="30" 
-                                        VerticalContentAlignment="Center"
-                                        Text="{Binding SearchTerm, UpdateSourceTrigger=PropertyChanged}"
-                                        FontSize="14"/>
-                                <Button Name="SearchButton" 
-                                       Content="검색" 
-                                       Margin="10,0,0,0" 
-                                       Padding="15,5" 
-                                       Background="#3498DB" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       Click="SearchButton_Click"/>
-                            </StackPanel>
-                            
-                            <!-- 정렬 옵션 -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0">
-                                <TextBlock Text="정렬:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox Name="SortComboBox" 
-                                         Width="120" 
-                                         Height="30"
-                                         SelectedIndex="0"
-                                         SelectionChanged="SortComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="이름순" Tag="name"/>
-                                    <ComboBoxItem Content="생성일순" Tag="created_at"/>
-                                    <ComboBoxItem Content="사용빈도순" Tag="usage_count"/>
-                                </ComboBox>
-                            </StackPanel>
-                            
-                            <!-- 새로고침 버튼 -->
-                            <Button Grid.Column="2" 
-                                   Name="RefreshButton"
-                                   Content="🔄 새로고침" 
-                                   Margin="20,0,0,0" 
-                                   Padding="15,5" 
-                                   Background="#27AE60" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   Click="RefreshButton_Click"/>
-                        </Grid>
-                    </Border>
+                    <!-- 페이지 제목 및 경로 -->
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Name="PageTitleText" 
+                                  Text="대시보드" 
+                                  FontSize="24" 
+                                  FontWeight="Bold" 
+                                  Foreground="#1A202C" 
+                                  Margin="0,0,0,5"/>
+                        <TextBlock Name="PageBreadcrumbText" 
+                                  Text="홈 > 대시보드" 
+                                  FontSize="14" 
+                                  Foreground="#718096"/>
+                    </StackPanel>
                     
-                    <!-- 버튼 그룹 -->
-                    <Border Grid.Row="1" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                            <Button Name="AddMacroButton" 
-                                   Content="➕ 새 매크로 추가" 
-                                   Margin="0,0,10,0" 
-                                   Padding="15,8" 
-                                   Background="#2ECC71" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   FontWeight="Bold"
-                                   Click="AddMacroButton_Click"/>
-                            <Button Name="EditMacroButton" 
-                                   Content="✏️ 수정" 
-                                   Margin="0,0,10,0" 
-                                   Padding="15,8" 
-                                   Background="#F39C12" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   IsEnabled="False"
-                                   Click="EditMacroButton_Click"/>
-                            <Button Name="CopyMacroButton" 
-                                   Content="📋 복사" 
-                                   Margin="0,0,10,0" 
-                                   Padding="15,8" 
-                                   Background="#3498DB" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   IsEnabled="False"
-                                   Click="CopyMacroButton_Click"/>
-                            <Button Name="DeleteMacroButton" 
-                                   Content="🗑️ 삭제" 
-                                   Margin="0,0,10,0" 
-                                   Padding="15,8" 
-                                   Background="#E74C3C" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   IsEnabled="False"
-                                   Click="DeleteMacroButton_Click"/>
+                    <!-- 검색 박스 -->
+                    <Border Grid.Column="1" 
+                           Background="#F7FAFC" 
+                           BorderBrush="#E2E8F0" 
+                           BorderThickness="1" 
+                           CornerRadius="8" 
+                           Padding="15,8" 
+                           Margin="0,0,20,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔍" FontSize="16" Foreground="#A0AEC0" Margin="0,0,10,0"/>
+                            <TextBox Name="GlobalSearchBox" 
+                                    Width="200" 
+                                    Background="Transparent" 
+                                    BorderThickness="0" 
+                                    FontSize="14" 
+                                    Foreground="#2D3748"
+                                    Text="검색..."
+                                    GotFocus="GlobalSearchBox_GotFocus"
+                                    LostFocus="GlobalSearchBox_LostFocus"/>
                         </StackPanel>
                     </Border>
                     
-                    <!-- 매크로 목록 DataGrid -->
-                    <Border Grid.Row="2" Background="White" CornerRadius="5">
-                        <DataGrid Name="MacroDataGrid" 
-                                 AutoGenerateColumns="False"
-                                 CanUserAddRows="False"
-                                 CanUserDeleteRows="False"
-                                 CanUserResizeRows="False"
-                                 SelectionMode="Single"
-                                 GridLinesVisibility="Horizontal"
-                                 HeadersVisibility="Column"
-                                 AlternatingRowBackground="#F8F9FA"
-                                 RowBackground="White"
-                                 BorderThickness="0"
-                                 FontSize="12"
-                                 SelectionChanged="MacroDataGrid_SelectionChanged">
-                            
-                            <!-- 컬럼 정의 -->
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="ID" 
-                                                   Binding="{Binding Id}" 
-                                                   Width="60" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="매크로 이름" 
-                                                   Binding="{Binding Name}" 
-                                                   Width="200" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="음성 명령어" 
-                                                   Binding="{Binding VoiceCommand}" 
-                                                   Width="200" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="동작 설명" 
-                                                   Binding="{Binding KeySequence}" 
-                                                   Width="250" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="타입" 
-                                                   Binding="{Binding ActionType}" 
-                                                   Width="100" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="종류" 
-                                                   Binding="{Binding MacroTypeDisplay}" 
-                                                   Width="80" 
-                                                   IsReadOnly="True">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{Binding MacroTypeColor}"/>
-                                            <Setter Property="FontWeight" Value="Bold"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="생성일" 
-                                                   Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd}}" 
-                                                   Width="100" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="사용 횟수" 
-                                                   Binding="{Binding UsageCount}" 
-                                                   Width="100" 
-                                                   IsReadOnly="True"/>
-                            </DataGrid.Columns>
-                            
-                            <!-- 행 스타일 -->
-                            <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow">
-                                    <Setter Property="Height" Value="35"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#E8F6F3"/>
-                                        </Trigger>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="Background" Value="#3498DB"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DataGrid.RowStyle>
-                            
-                            <!-- 헤더 스타일 -->
-                            <DataGrid.ColumnHeaderStyle>
-                                <Style TargetType="DataGridColumnHeader">
-                                    <Setter Property="Background" Value="#34495E"/>
-                                    <Setter Property="Foreground" Value="White"/>
-                                    <Setter Property="FontWeight" Value="Bold"/>
-                                    <Setter Property="Padding" Value="10,8"/>
-                                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
-                                    <Setter Property="BorderBrush" Value="#2C3E50"/>
-                                </Style>
-                            </DataGrid.ColumnHeaderStyle>
-                        </DataGrid>
-                    </Border>
+                    <!-- 알림 및 설정 -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Button Name="NotificationButton" 
+                               Style="{StaticResource HeaderIconButtonStyle}">
+                            <TextBlock Text="🔔" FontSize="18"/>
+                        </Button>
+                        <Button Name="SettingsButton" 
+                               Style="{StaticResource HeaderIconButtonStyle}"
+                               Margin="10,0,0,0">
+                            <TextBlock Text="⚙️" FontSize="18"/>
+                        </Button>
+                    </StackPanel>
                 </Grid>
-            </TabItem>
+            </Border>
             
-            <!-- 커스텀 스크립팅 탭 -->
-            <TabItem Header="🔧 커스텀 스크립팅" FontSize="14" Padding="15,10">
-                <Grid Margin="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    
-                    <!-- 상단 제어 패널 -->
-                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 검색 및 필터 -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <TextBox Name="ScriptSearchTextBox" 
-                                        Width="200" 
-                                        Height="30" 
-                                        VerticalContentAlignment="Center"
-                                        FontSize="14"/>
-                                <ComboBox Name="ScriptCategoryComboBox" 
-                                         Width="120" 
-                                         Height="30"
-                                         Margin="10,0,0,0">
-                                    <ComboBoxItem Content="모든 카테고리" Tag=""/>
-                                    <ComboBoxItem Content="전투" Tag="전투"/>
-                                    <ComboBoxItem Content="이동" Tag="이동"/>
-                                    <ComboBoxItem Content="상호작용" Tag="상호작용"/>
-                                    <ComboBoxItem Content="UI 조작" Tag="UI 조작"/>
-                                    <ComboBoxItem Content="기타" Tag="기타"/>
-                                </ComboBox>
-                                <ComboBox Name="ScriptGameComboBox" 
-                                         Width="120" 
-                                         Height="30"
-                                         Margin="10,0,0,0">
-                                    <ComboBoxItem Content="모든 게임" Tag=""/>
-                                    <ComboBoxItem Content="LOL" Tag="LOL"/>
-                                    <ComboBoxItem Content="PUBG" Tag="PUBG"/>
-                                    <ComboBoxItem Content="VALORANT" Tag="VALORANT"/>
-                                    <ComboBoxItem Content="공통" Tag="공통"/>
-                                </ComboBox>
-                            </StackPanel>
-                            
-                            <!-- 정렬 옵션 -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0">
-                                <TextBlock Text="정렬:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox Name="ScriptSortComboBox" 
-                                         Width="120" 
-                                         Height="30"
-                                         SelectedIndex="0">
-                                    <ComboBoxItem Content="이름순" Tag="name"/>
-                                    <ComboBoxItem Content="생성일순" Tag="created_at"/>
-                                    <ComboBoxItem Content="사용빈도순" Tag="usage_count"/>
-                                </ComboBox>
-                            </StackPanel>
-                            
-                            <!-- 액션 버튼들 -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="20,0,0,0">
-                                <Button Name="RefreshScriptsButton"
-                                       Content="🔄 새로고침" 
-                                       Margin="0,0,10,0" 
-                                       Padding="10,5" 
-                                       Background="#27AE60" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       Click="RefreshScriptsButton_Click"/>
-                                <Button Name="NewScriptButton"
-                                       Content="➕ 새 스크립트" 
-                                       Padding="15,5" 
-                                       Background="#2ECC71" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       FontWeight="Bold"
-                                       Click="NewScriptButton_Click"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- 메인 콘텐츠 영역 (좌우 분할) -->
-                    <Grid Grid.Row="1">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="350"/>
-                            <ColumnDefinition Width="5"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <!-- 좌측: 스크립트 목록 -->
-                        <Border Grid.Column="0" Background="White" CornerRadius="5" Padding="10">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                
-                                <!-- 스크립트 목록 헤더 -->
-                                <TextBlock Grid.Row="0" 
-                                          Text="📜 스크립트 목록" 
-                                          FontWeight="Bold" 
-                                          FontSize="16" 
-                                          Margin="0,0,0,10"/>
-                                
-                                <!-- 스크립트 목록 DataGrid -->
-                                <DataGrid Grid.Row="1" 
-                                         Name="CustomScriptDataGrid" 
-                                         AutoGenerateColumns="False"
-                                         CanUserAddRows="False"
-                                         CanUserDeleteRows="False"
-                                         SelectionMode="Single"
-                                         GridLinesVisibility="Horizontal"
-                                         HeadersVisibility="Column"
-                                         AlternatingRowBackground="#F8F9FA"
-                                         RowBackground="White"
-                                         BorderThickness="0"
-                                         FontSize="11"
-                                         SelectionChanged="CustomScriptDataGrid_SelectionChanged">
-                                    
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="이름" 
-                                                           Binding="{Binding Name}" 
-                                                           Width="140" 
-                                                           IsReadOnly="True"/>
-                                        <DataGridTextColumn Header="카테고리" 
-                                                           Binding="{Binding Category}" 
-                                                           Width="80" 
-                                                           IsReadOnly="True"/>
-                                        <DataGridTextColumn Header="상태" 
-                                                           Binding="{Binding StatusText}" 
-                                                           Width="60" 
-                                                           IsReadOnly="True">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{Binding StatusColor}"/>
-                                                    <Setter Property="FontWeight" Value="Bold"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="성공률" 
-                                                           Binding="{Binding SuccessRateText}" 
-                                                           Width="70" 
-                                                           IsReadOnly="True">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{Binding SuccessRateColor}"/>
-                                                    <Setter Property="FontWeight" Value="Bold"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                    </DataGrid.Columns>
-                                    
-                                    <DataGrid.RowStyle>
-                                        <Style TargetType="DataGridRow">
-                                            <Setter Property="Height" Value="30"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#E8F6F3"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter Property="Background" Value="#3498DB"/>
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </DataGrid.RowStyle>
-                                    
-                                    <DataGrid.ColumnHeaderStyle>
-                                        <Style TargetType="DataGridColumnHeader">
-                                            <Setter Property="Background" Value="#34495E"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                            <Setter Property="FontWeight" Value="Bold"/>
-                                            <Setter Property="FontSize" Value="11"/>
-                                            <Setter Property="Padding" Value="8,6"/>
-                                        </Style>
-                                    </DataGrid.ColumnHeaderStyle>
-                                </DataGrid>
-                                
-                                <!-- 스크립트 관리 버튼들 -->
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-                                    <Button Name="EditScriptButton" 
-                                           Content="✏️ 수정" 
-                                           Margin="0,0,5,0" 
-                                           Padding="10,5" 
-                                           Background="#F39C12" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           IsEnabled="False"
-                                           Click="EditScriptButton_Click"/>
-                                    <Button Name="CopyScriptButton" 
-                                           Content="📋 복사" 
-                                           Margin="0,0,5,0" 
-                                           Padding="10,5" 
-                                           Background="#3498DB" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           IsEnabled="False"
-                                           Click="CopyScriptButton_Click"/>
-                                    <Button Name="DeleteScriptButton" 
-                                           Content="🗑️ 삭제" 
-                                           Margin="0,0,5,0" 
-                                           Padding="10,5" 
-                                           Background="#E74C3C" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           IsEnabled="False"
-                                           Click="DeleteScriptButton_Click"/>
-                                    <Button Name="ExecuteScriptButton" 
-                                           Content="▶️ 실행" 
-                                           Padding="10,5" 
-                                           Background="#28A745" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           IsEnabled="False"
-                                           Click="ExecuteScriptButton_Click"/>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                        
-                        <!-- 중앙: 구분선 -->
-                        <GridSplitter Grid.Column="1" 
-                                     HorizontalAlignment="Stretch" 
-                                     VerticalAlignment="Stretch"
-                                     Background="#BDC3C7"
-                                     ShowsPreview="True"/>
-                        
-                        <!-- 우측: 스크립트 에디터 -->
-                        <Border Grid.Column="2" Background="White" CornerRadius="5" Padding="15">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="120"/>
-                                </Grid.RowDefinitions>
-                                
-                                <!-- 에디터 헤더 -->
-                                <Grid Grid.Row="0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <TextBlock Grid.Column="0" 
-                                              Name="ScriptEditorTitle"
-                                              Text="🔧 MSL 스크립트 에디터" 
-                                              FontWeight="Bold" 
-                                              FontSize="16" 
-                                              Margin="0,0,0,15"/>
-                                              
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                        <Button Name="ValidateScriptButton"
-                                               Content="✅ 검증" 
-                                               Margin="0,0,10,0" 
-                                               Padding="10,5" 
-                                               Background="#17A2B8" 
-                                               Foreground="White" 
-                                               BorderThickness="0"
-                                               Click="ValidateScriptButton_Click"/>
-                                        <Button Name="SaveScriptButton"
-                                               Content="💾 저장" 
-                                               Padding="15,5" 
-                                               Background="#28A745" 
-                                               Foreground="White" 
-                                               BorderThickness="0"
-                                               FontWeight="Bold"
-                                               Click="SaveScriptButton_Click"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <!-- 스크립트 정보 입력 -->
-                                <Grid Grid.Row="1" Margin="0,0,0,15">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="150"/>
-                                        <ColumnDefinition Width="150"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    
-                                    <!-- 스크립트 이름 -->
-                                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
-                                        <TextBlock Text="스크립트 이름:" FontWeight="Bold" Margin="0,0,0,5"/>
-                                        <TextBox Name="ScriptNameTextBox" 
-                                                Height="30" 
-                                                VerticalContentAlignment="Center"
-                                                FontSize="14"/>
-                                    </StackPanel>
-                                    
-                                    <!-- 카테고리 -->
-                                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,10,10">
-                                        <TextBlock Text="카테고리:" FontWeight="Bold" Margin="0,0,0,5"/>
-                                        <ComboBox Name="ScriptCategoryEditComboBox" 
-                                                 Height="30"
-                                                 IsEditable="True">
-                                            <ComboBoxItem Content="전투"/>
-                                            <ComboBoxItem Content="이동"/>
-                                            <ComboBoxItem Content="상호작용"/>
-                                            <ComboBoxItem Content="UI 조작"/>
-                                            <ComboBoxItem Content="기타"/>
-                                        </ComboBox>
-                                    </StackPanel>
-                                    
-                                    <!-- 게임 -->
-                                    <StackPanel Grid.Row="0" Grid.Column="2">
-                                        <TextBlock Text="대상 게임:" FontWeight="Bold" Margin="0,0,0,5"/>
-                                        <ComboBox Name="ScriptGameEditComboBox" 
-                                                 Height="30"
-                                                 IsEditable="True">
-                                            <ComboBoxItem Content="LOL"/>
-                                            <ComboBoxItem Content="PUBG"/>
-                                            <ComboBoxItem Content="VALORANT"/>
-                                            <ComboBoxItem Content="공통"/>
-                                        </ComboBox>
-                                    </StackPanel>
-                                    
-                                    <!-- 설명 -->
-                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,0">
-                                        <TextBlock Text="설명:" FontWeight="Bold" Margin="0,0,0,5"/>
-                                        <TextBox Name="ScriptDescriptionTextBox" 
-                                                Height="30" 
-                                                VerticalContentAlignment="Center"
-                                                FontSize="14"/>
-                                    </StackPanel>
-                                </Grid>
-                                
-                                <!-- MSL 코드 에디터 -->
-                                <Grid Grid.Row="2">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    
-                                    <TextBlock Grid.Row="0" 
-                                              Text="MSL 코드:" 
-                                              FontWeight="Bold" 
-                                              Margin="0,0,0,5"/>
-                                    
-                                    <Border Grid.Row="1" 
-                                           BorderBrush="#BDC3C7" 
-                                           BorderThickness="1" 
-                                           CornerRadius="3">
-                                        <TextBox Name="ScriptCodeTextBox" 
-                                                AcceptsReturn="True" 
-                                                AcceptsTab="True"
-                                                TextWrapping="NoWrap"
-                                                VerticalScrollBarVisibility="Auto"
-                                                HorizontalScrollBarVisibility="Auto"
-                                                FontFamily="Consolas"
-                                                FontSize="12"
-                                                Background="#FAFAFA"
-                                                Padding="10"
-                                                Text="// MSL 스크립트를 여기에 작성하세요&#x0A;// 예시:&#x0A;action &quot;기본 공격&quot; {&#x0A;    press Q&#x0A;    wait 100ms&#x0A;    press W&#x0A;}"
-                                                TextChanged="ScriptCodeTextBox_TextChanged"/>
-                                    </Border>
-                                </Grid>
-                                
-                                <!-- 구분선 -->
-                                <Separator Grid.Row="3" Margin="0,15"/>
-                                
-                                <!-- 하단: 검증 결과 및 로그 -->
-                                <Grid Grid.Row="4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="5"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <!-- 검증 결과 -->
-                                    <StackPanel Grid.Column="0">
-                                        <TextBlock Text="✅ 검증 결과:" FontWeight="Bold" Margin="0,0,0,5"/>
-                                        <Border Background="#F8F9FA" 
-                                               BorderBrush="#DEE2E6" 
-                                               BorderThickness="1" 
-                                               CornerRadius="3" 
-                                               Height="85">
-                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                <TextBlock Name="ValidationResultTextBlock" 
-                                                          Text="스크립트를 작성하고 검증 버튼을 클릭하세요." 
-                                                          TextWrapping="Wrap" 
-                                                          Margin="8"
-                                                          FontSize="11"
-                                                          Foreground="#6C757D"/>
-                                            </ScrollViewer>
-                                        </Border>
-                                    </StackPanel>
-                                    
-                                    <GridSplitter Grid.Column="1" 
-                                                 HorizontalAlignment="Stretch" 
-                                                 VerticalAlignment="Stretch"
-                                                 Background="#E0E0E0"/>
-                                    
-                                    <!-- 실행 로그 -->
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="📋 실행 로그:" FontWeight="Bold" Margin="0,0,0,5"/>
-                                        <Border Background="#F8F9FA" 
-                                               BorderBrush="#DEE2E6" 
-                                               BorderThickness="1" 
-                                               CornerRadius="3" 
-                                               Height="85">
-                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                <TextBlock Name="ExecutionLogTextBlock" 
-                                                          Text="스크립트 실행 로그가 여기에 표시됩니다." 
-                                                          TextWrapping="Wrap" 
-                                                          Margin="8"
-                                                          FontSize="11"
-                                                          Foreground="#6C757D"/>
-                                            </ScrollViewer>
-                                        </Border>
-                                    </StackPanel>
-                                </Grid>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                    
-                    <!-- 하단 상태 바 -->
-                    <Border Grid.Row="2" Background="#2C3E50" Padding="15,8" Margin="0,10,0,0" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <TextBlock Grid.Column="0" 
-                                      Name="ScriptStatusTextBlock"
-                                      Text="준비됨" 
-                                      Foreground="White" 
-                                      VerticalAlignment="Center"/>
-                            
-                            <TextBlock Grid.Column="1" 
-                                      Name="ScriptCountTextBlock"
-                                      Text="스크립트: 0개" 
-                                      Foreground="#BDC3C7" 
-                                      VerticalAlignment="Center"
-                                      Margin="0,0,20,0"/>
-                            
-                            <Button Grid.Column="2" 
-                                   Name="ScriptTemplatesButton"
-                                   Content="📋 템플릿 보기" 
-                                   Padding="15,5" 
-                                   Background="#9B59B6" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   Click="ScriptTemplatesButton_Click"/>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </TabItem>
+            <!-- 메인 콘텐츠 컨테이너 -->
+            <Border Grid.Row="1" Background="Transparent" Margin="15,10,15,0">
+                <ContentPresenter Name="MainContentPresenter">
+                    <!-- 기본 대시보드 콘텐츠가 여기에 표시됩니다 -->
+                </ContentPresenter>
+            </Border>
             
-            <!-- PRD 3.2.3 음성 인식 시스템 -->
-            <TabItem Header="🎤 음성 인식" FontSize="14" Padding="15,10">
-                <Grid Margin="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    
-                    <!-- 음성 입력 상태 표시 -->
-                    <Border Grid.Row="0" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 마이크 레벨 게이지 -->
-                            <StackPanel Grid.Column="0" Margin="0,0,20,0">
-                                <TextBlock Text="🎤 마이크 레벨" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <ProgressBar Name="MicLevelProgressBar" 
-                                           Height="25" 
-                                           Background="#E9ECEF"
-                                           Foreground="#28A745"
-                                           Minimum="0" 
-                                           Maximum="1"
-                                           Value="0"/>
-                                <TextBlock Name="MicLevelTextBlock" 
-                                          Text="0%" 
-                                          HorizontalAlignment="Center" 
-                                          FontSize="12" 
-                                          Margin="0,5,0,0"/>
-                            </StackPanel>
-                            
-                            <!-- 녹음 상태 표시 -->
-                            <StackPanel Grid.Column="1" HorizontalAlignment="Center" Margin="20,0">
-                                <TextBlock Text="📡 녹음 상태" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <Ellipse Name="RecordingStatusIndicator" 
-                                        Width="50" 
-                                        Height="50" 
-                                        Fill="#DC3545"
-                                        HorizontalAlignment="Center"/>
-                                <TextBlock Name="RecordingStatusText" 
-                                          Text="중지" 
-                                          HorizontalAlignment="Center" 
-                                          FontSize="12" 
-                                          FontWeight="Bold"
-                                          Margin="0,5,0,0"/>
-                                
-                                <!-- 녹음 제어 버튼 -->
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-                                    <Button Name="StartRecordingButton"
-                                           Content="🎤 녹음 시작" 
-                                           Padding="15,8" 
-                                           Background="#28A745" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           Margin="0,0,10,0"
-                                           Click="StartRecordingButton_Click"/>
-                                    <Button Name="StopRecordingButton"
-                                           Content="⏹️ 녹음 중지" 
-                                           Padding="15,8" 
-                                           Background="#DC3545" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           IsEnabled="False"
-                                           Click="StopRecordingButton_Click"/>
-                                </StackPanel>
-                            </StackPanel>
-                            
-                            <!-- 인식된 텍스트 표시창 -->
-                            <StackPanel Grid.Column="2" Margin="20,0,0,0">
-                                <TextBlock Text="💬 인식된 텍스트" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <Border Background="#F8F9FA" 
-                                       BorderBrush="#DEE2E6" 
-                                       BorderThickness="1" 
-                                       CornerRadius="5" 
-                                       Height="80">
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                        <TextBlock Name="RecognizedTextBlock" 
-                                                  Text="음성 인식을 시작하세요..." 
-                                                  TextWrapping="Wrap" 
-                                                  Margin="10"
-                                                  FontSize="14"
-                                                  Foreground="#6C757D"/>
-                                    </ScrollViewer>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- 설정 그룹 -->
-                    <Border Grid.Row="1" Background="White" Padding="20" Margin="0,0,0,15" CornerRadius="8">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 마이크 선택 -->
-                            <StackPanel Grid.Column="0" Margin="0,0,20,0">
-                                <TextBlock Text="🎙️ 마이크 선택" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <ComboBox Name="MicrophoneComboBox" 
-                                         Height="35"
-                                         FontSize="12"
-                                         SelectionChanged="MicrophoneComboBox_SelectionChanged"/>
-                            </StackPanel>
-                            
-                            <!-- 감도 조절 -->
-                            <StackPanel Grid.Column="1" Margin="0,0,20,0">
-                                <TextBlock Text="📊 감도 조절" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Slider Name="SensitivitySlider" 
-                                           Grid.Column="0"
-                                           Height="35"
-                                           Minimum="0.1" 
-                                           Maximum="2.0" 
-                                           Value="1.0"
-                                           TickFrequency="0.1"
-                                           ValueChanged="SensitivitySlider_ValueChanged"/>
-                                    <TextBlock Grid.Column="1" 
-                                              Name="SensitivityValueText"
-                                              Text="1.0x" 
-                                              VerticalAlignment="Center" 
-                                              Margin="10,0,0,0"
-                                              FontWeight="Bold"/>
-                                </Grid>
-                            </StackPanel>
-                            
-                            <!-- 언어 선택 -->
-                            <StackPanel Grid.Column="2" Margin="0,0,20,0">
-                                <TextBlock Text="🌐 언어 선택" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <ComboBox Name="LanguageComboBox" 
-                                         Height="35"
-                                         FontSize="12"
-                                         SelectedIndex="0"
-                                         SelectionChanged="LanguageComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="한국어 (ko)" Tag="ko"/>
-                                    <ComboBoxItem Content="English (en)" Tag="en"/>
-                                </ComboBox>
-                            </StackPanel>
-                            
-                            <!-- 마이크 테스트 버튼 -->
-                            <StackPanel Grid.Column="3">
-                                <TextBlock Text="🔧 테스트" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <Button Name="TestMicrophoneButton"
-                                           Content="🧪 마이크 테스트" 
-                                           Padding="15,8" 
-                                           Background="#17A2B8" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           Margin="0,0,5,0"
-                                           Click="TestMicrophoneButton_Click"/>
-                                    <Button Name="RefreshMicrophoneButton"
-                                           Content="🔄 새로고침" 
-                                           Padding="10,8" 
-                                           Background="#28A745" 
-                                           Foreground="White" 
-                                           BorderThickness="0"
-                                           Click="RefreshMicrophoneButton_Click"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- 매칭 결과 표시 -->
-                    <Border Grid.Row="2" Background="White" Padding="15" CornerRadius="8">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            
-                            <!-- 매칭 결과 헤더 -->
-                            <TextBlock Grid.Row="0" 
-                                      Text="🎯 매칭된 매크로 목록" 
-                                      FontWeight="Bold" 
-                                      FontSize="16" 
-                                      Margin="0,0,0,15"/>
-                            
-                            <!-- 매칭 결과 DataGrid -->
-                            <DataGrid Grid.Row="1"
-                                     Name="MatchedMacrosDataGrid" 
-                                     AutoGenerateColumns="False"
-                                     CanUserAddRows="False"
-                                     CanUserDeleteRows="False"
-                                     CanUserResizeRows="False"
-                                     SelectionMode="Single"
-                                     GridLinesVisibility="Horizontal"
-                                     HeadersVisibility="Column"
-                                     AlternatingRowBackground="#F8F9FA"
-                                     RowBackground="White"
-                                     BorderThickness="1"
-                                     BorderBrush="#DEE2E6"
-                                     FontSize="12"
-                                     MouseDoubleClick="MatchedMacrosDataGrid_MouseDoubleClick">
-                                
-                                <!-- 매칭 결과 컬럼 정의 -->
-                                <DataGrid.Columns>
-                                    <DataGridTextColumn Header="순위" 
-                                                       Binding="{Binding Rank}" 
-                                                       Width="60" 
-                                                       IsReadOnly="True">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                <Setter Property="FontWeight" Value="Bold"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    
-                                    <DataGridTextColumn Header="매크로 이름" 
-                                                       Binding="{Binding MacroName}" 
-                                                       Width="200" 
-                                                       IsReadOnly="True"/>
-                                    
-                                    <DataGridTextColumn Header="음성 명령어" 
-                                                       Binding="{Binding VoiceCommand}" 
-                                                       Width="200" 
-                                                       IsReadOnly="True"/>
-                                    
-                                    <DataGridTextColumn Header="확신도" 
-                                                       Binding="{Binding ConfidenceText}" 
-                                                       Width="100" 
-                                                       IsReadOnly="True">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                <Setter Property="FontWeight" Value="Bold"/>
-                                                <Setter Property="Foreground" Value="{Binding ConfidenceColor}"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
-                                    
-                                    <DataGridTextColumn Header="동작 설명" 
-                                                       Binding="{Binding ActionDescription}" 
-                                                       Width="*" 
-                                                       IsReadOnly="True"/>
-                                    
-                                    <DataGridTemplateColumn Header="실행" Width="80">
-                                        <DataGridTemplateColumn.CellTemplate>
-                                            <DataTemplate>
-                                                <Button Content="▶️" 
-                                                       Padding="5" 
-                                                       Background="#28A745" 
-                                                       Foreground="White" 
-                                                       BorderThickness="0"
-                                                       Click="ExecuteMacroButton_Click"
-                                                       Tag="{Binding MacroId}"/>
-                                            </DataTemplate>
-                                        </DataGridTemplateColumn.CellTemplate>
-                                    </DataGridTemplateColumn>
-                                </DataGrid.Columns>
-                                
-                                <!-- 행 스타일 -->
-                                <DataGrid.RowStyle>
-                                    <Style TargetType="DataGridRow">
-                                        <Setter Property="Height" Value="40"/>
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#E8F5E8"/>
-                                            </Trigger>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter Property="Background" Value="#28A745"/>
-                                                <Setter Property="Foreground" Value="White"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </DataGrid.RowStyle>
-                                
-                                <!-- 헤더 스타일 -->
-                                <DataGrid.ColumnHeaderStyle>
-                                    <Style TargetType="DataGridColumnHeader">
-                                        <Setter Property="Background" Value="#198754"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="FontWeight" Value="Bold"/>
-                                        <Setter Property="Padding" Value="10,8"/>
-                                        <Setter Property="BorderThickness" Value="0,0,1,0"/>
-                                        <Setter Property="BorderBrush" Value="#146C43"/>
-                                    </Style>
-                                </DataGrid.ColumnHeaderStyle>
-                            </DataGrid>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </TabItem>
-            
-            <!-- PRD 3.5 로그 및 모니터링 시스템 -->
-            <TabItem Header="📊 로그 및 모니터링" FontSize="14" Padding="15,10">
-                <Grid Margin="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    
-                    <!-- 로그 제어 패널 -->
-                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 로그 레벨 선택 -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,20,0">
-                                <TextBlock Text="로그 레벨:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <ComboBox Name="LogLevelComboBox" 
-                                         Width="100" 
-                                         Height="30"
-                                         SelectedIndex="1"
-                                         SelectionChanged="LogLevelComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Debug" Tag="Debug"/>
-                                    <ComboBoxItem Content="Info" Tag="Info"/>
-                                    <ComboBoxItem Content="Warning" Tag="Warning"/>
-                                    <ComboBoxItem Content="Error" Tag="Error"/>
-                                </ComboBox>
-                            </StackPanel>
-                            
-                            <!-- 필터 검색박스 -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,20,0">
-                                <TextBlock Text="필터:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <TextBox Name="LogFilterTextBox" 
-                                        Width="200" 
-                                        Height="30" 
-                                        VerticalContentAlignment="Center"
-                                        FontSize="14"
-                                        TextChanged="LogFilterTextBox_TextChanged"/>
-                            </StackPanel>
-                            
-                            <!-- 자동 스크롤 체크박스 -->
-                            <CheckBox Grid.Column="2" 
-                                     Name="AutoScrollCheckBox"
-                                     Content="자동 스크롤" 
-                                     VerticalAlignment="Center"
-                                     IsChecked="True"
-                                     Checked="AutoScrollCheckBox_Checked"
-                                     Unchecked="AutoScrollCheckBox_Unchecked"/>
-                            
-                            <!-- 로그 관리 버튼들 -->
-                            <Button Grid.Column="3" 
-                                   Name="ExportLogButton"
-                                   Content="📁 로그 저장" 
-                                   Margin="10,0,0,0" 
-                                   Padding="15,5" 
-                                   Background="#17A2B8" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   Click="ExportLogButton_Click"/>
-                            
-                            <Button Grid.Column="4" 
-                                   Name="ClearLogButton"
-                                   Content="🗑️ 로그 지우기" 
-                                   Margin="10,0,0,0" 
-                                   Padding="15,5" 
-                                   Background="#DC3545" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   Click="ClearLogButton_Click"/>
-                            
-                            <!-- 로그 통계 -->
-                            <TextBlock Grid.Column="5" 
-                                      Name="LogCountTextBlock"
-                                      Text="총 0개 로그" 
-                                      VerticalAlignment="Center" 
-                                      Margin="20,0,0,0"
-                                      FontWeight="Bold"/>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- 실시간 로그 출력창 -->
-                    <Border Grid.Row="1" Background="White" CornerRadius="5">
-                        <DataGrid Name="LogDataGrid" 
-                                 AutoGenerateColumns="False"
-                                 CanUserAddRows="False"
-                                 CanUserDeleteRows="False"
-                                 CanUserResizeRows="False"
-                                 SelectionMode="Single"
-                                 GridLinesVisibility="Horizontal"
-                                 HeadersVisibility="Column"
-                                 AlternatingRowBackground="#F8F9FA"
-                                 RowBackground="White"
-                                 BorderThickness="0"
-                                 FontSize="11"
-                                 FontFamily="Consolas, Monaco, 'Courier New', monospace">
-                            
-                            <!-- 로그 컬럼 정의 -->
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="시간" 
-                                                   Binding="{Binding TimeText}" 
-                                                   Width="100" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="레벨" 
-                                                   Binding="{Binding LevelText}" 
-                                                   Width="80" 
-                                                   IsReadOnly="True">
-                                    <DataGridTextColumn.ElementStyle>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{Binding LevelColor}"/>
-                                            <Setter Property="FontWeight" Value="Bold"/>
-                                        </Style>
-                                    </DataGridTextColumn.ElementStyle>
-                                </DataGridTextColumn>
-                                <DataGridTextColumn Header="메시지" 
-                                                   Binding="{Binding Message}" 
-                                                   Width="*" 
-                                                   IsReadOnly="True"/>
-                                <DataGridTextColumn Header="매크로 ID" 
-                                                   Binding="{Binding MacroId}" 
-                                                   Width="80" 
-                                                   IsReadOnly="True"/>
-                            </DataGrid.Columns>
-                            
-                            <!-- 로그 행 스타일 -->
-                            <DataGrid.RowStyle>
-                                <Style TargetType="DataGridRow">
-                                    <Setter Property="Height" Value="25"/>
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#E3F2FD"/>
-                                        </Trigger>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter Property="Background" Value="#2196F3"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DataGrid.RowStyle>
-                            
-                            <!-- 로그 헤더 스타일 -->
-                            <DataGrid.ColumnHeaderStyle>
-                                <Style TargetType="DataGridColumnHeader">
-                                    <Setter Property="Background" Value="#37474F"/>
-                                    <Setter Property="Foreground" Value="White"/>
-                                    <Setter Property="FontWeight" Value="Bold"/>
-                                    <Setter Property="Padding" Value="8,6"/>
-                                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
-                                    <Setter Property="BorderBrush" Value="#263238"/>
-                                </Style>
-                            </DataGrid.ColumnHeaderStyle>
-                        </DataGrid>
-                    </Border>
-                    
-                    <!-- 하단 통계 패널 -->
-                    <Border Grid.Row="2" Background="White" Padding="15" Margin="0,10,0,0" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 성능 통계 표시 (향후 구현) -->
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="매크로 실행 성공률" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="MacroSuccessRateTextBlock" Text="100%" FontSize="24" Foreground="#4CAF50"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="음성 인식 정확도" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="VoiceAccuracyTextBlock" Text="95%" FontSize="24" Foreground="#2196F3"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="시스템 상태" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="SystemStatusTextBlock" Text="정상" FontSize="24" Foreground="#4CAF50"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </TabItem>
-            
-
-            
-            <!-- PRD 3.4 프리셋 관리 시스템 -->
-            <TabItem Header="📁 프리셋 관리" FontSize="14" Padding="15,10">
-                <Grid Margin="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    
-                    <!-- 검색 및 필터 영역 -->
-                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 검색 박스 -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                <TextBlock Text="🔍 검색:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                <TextBox Name="PresetSearchTextBox" 
-                                        Width="300" 
-                                        Height="30" 
-                                        VerticalContentAlignment="Center"
-                                        FontSize="14"
-                                        TextChanged="PresetSearchTextBox_TextChanged"/>
-                                <Button Name="PresetSearchButton" 
-                                       Content="검색" 
-                                       Margin="10,0,0,0" 
-                                       Padding="15,5" 
-                                       Background="#3498DB" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       Click="PresetSearchButton_Click"/>
-                            </StackPanel>
-                            
-                            <!-- 즐겨찾기 필터 -->
-                            <CheckBox Grid.Column="1" 
-                                     Name="FavoritesOnlyCheckBox"
-                                     Content="⭐ 즐겨찾기만" 
-                                     VerticalAlignment="Center"
-                                     Margin="20,0,0,0"
-                                     Checked="FavoritesOnlyCheckBox_Changed"
-                                     Unchecked="FavoritesOnlyCheckBox_Changed"/>
-                            
-                            <!-- 통계 정보 -->
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="20,0,0,0">
-                                <TextBlock Name="PresetCountTextBlock" 
-                                          Text="총 0개 프리셋" 
-                                          VerticalAlignment="Center" 
-                                          FontWeight="Bold"/>
-                            </StackPanel>
-                            
-                            <!-- 새로고침 버튼 -->
-                            <Button Grid.Column="3" 
-                                   Name="RefreshPresetsButton"
-                                   Content="🔄 새로고침" 
-                                   Margin="20,0,0,0" 
-                                   Padding="15,5" 
-                                   Background="#27AE60" 
-                                   Foreground="White" 
-                                   BorderThickness="0"
-                                   Click="RefreshPresetsButton_Click"/>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- 프리셋 조작 버튼 그룹 -->
-                    <Border Grid.Row="1" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 기본 CRUD 버튼들 -->
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
-                                <Button Name="NewPresetButton" 
-                                       Content="➕ 새 프리셋" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#2ECC71" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       FontWeight="Bold"
-                                       Click="NewPresetButton_Click"/>
-                                <Button Name="EditPresetButton" 
-                                       Content="✏️ 수정" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#F39C12" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       IsEnabled="False"
-                                       Click="EditPresetButton_Click"/>
-                                <Button Name="CopyPresetButton" 
-                                       Content="📋 복사" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#3498DB" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       IsEnabled="False"
-                                       Click="CopyPresetButton_Click"/>
-                                <Button Name="DeletePresetButton" 
-                                       Content="🗑️ 삭제" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#E74C3C" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       IsEnabled="False"
-                                       Click="DeletePresetButton_Click"/>
-                            </StackPanel>
-                            
-                            <!-- 파일 및 특수 기능 버튼들 -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button Name="ImportPresetButton" 
-                                       Content="📥 가져오기" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#9B59B6" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       Click="ImportPresetButton_Click"/>
-                                <Button Name="ExportPresetButton" 
-                                       Content="📤 내보내기" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#34495E" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       IsEnabled="False"
-                                       Click="ExportPresetButton_Click"/>
-                                <Button Name="ApplyPresetButton" 
-                                       Content="✅ 적용" 
-                                       Margin="0,0,10,0" 
-                                       Padding="15,8" 
-                                       Background="#27AE60" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       IsEnabled="False"
-                                       FontWeight="Bold"
-                                       Click="ApplyPresetButton_Click"/>
-                                <Button Name="ToggleFavoriteButton" 
-                                       Content="⭐ 즐겨찾기" 
-                                       Padding="15,8" 
-                                       Background="#F39C12" 
-                                       Foreground="White" 
-                                       BorderThickness="0"
-                                       IsEnabled="False"
-                                       Click="ToggleFavoriteButton_Click"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                    
-                    <!-- 메인 콘텐츠: 프리셋 목록과 미리보기 -->
-                    <Grid Grid.Row="2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*"/>
-                            <ColumnDefinition Width="5"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <!-- 프리셋 목록 -->
-                        <Border Grid.Column="0" Background="White" CornerRadius="5">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-                                
-                                <TextBlock Grid.Row="0" 
-                                          Text="📋 프리셋 목록" 
-                                          FontWeight="Bold" 
-                                          FontSize="16" 
-                                          Margin="15,15,15,10"/>
-                                
-                                <DataGrid Grid.Row="1"
-                                         Name="PresetDataGrid" 
-                                         AutoGenerateColumns="False"
-                                         CanUserAddRows="False"
-                                         CanUserDeleteRows="False"
-                                         CanUserResizeRows="False"
-                                         SelectionMode="Single"
-                                         GridLinesVisibility="Horizontal"
-                                         HeadersVisibility="Column"
-                                         AlternatingRowBackground="#F8F9FA"
-                                         RowBackground="White"
-                                         BorderThickness="0"
-                                         FontSize="12"
-                                         Margin="10"
-                                         SelectionChanged="PresetDataGrid_SelectionChanged"
-                                         MouseDoubleClick="PresetDataGrid_MouseDoubleClick">
-                                    
-                                    <!-- 프리셋 컬럼 정의 -->
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="ID" 
-                                                           Binding="{Binding Id}" 
-                                                           Width="50" 
-                                                           IsReadOnly="True"/>
-                                        <DataGridTextColumn Header="즐겨찾기" 
-                                                           Binding="{Binding FavoriteIcon}" 
-                                                           Width="60" 
-                                                           IsReadOnly="True">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                    <Setter Property="FontSize" Value="16"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="프리셋 이름" 
-                                                           Binding="{Binding Name}" 
-                                                           Width="200" 
-                                                           IsReadOnly="True"/>
-                                        <DataGridTextColumn Header="설명" 
-                                                           Binding="{Binding DisplayDescription}" 
-                                                           Width="250" 
-                                                           IsReadOnly="True"/>
-                                        <DataGridTextColumn Header="매크로 개수" 
-                                                           Binding="{Binding MacroCountText}" 
-                                                           Width="100" 
-                                                           IsReadOnly="True">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="생성일" 
-                                                           Binding="{Binding CreatedAtText}" 
-                                                           Width="100" 
-                                                           IsReadOnly="True">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="HorizontalAlignment" Value="Center"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                    </DataGrid.Columns>
-                                    
-                                    <!-- 행 스타일 -->
-                                    <DataGrid.RowStyle>
-                                        <Style TargetType="DataGridRow">
-                                            <Setter Property="Height" Value="40"/>
-                                            <Style.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter Property="Background" Value="#E8F6F3"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter Property="Background" Value="#2ECC71"/>
-                                                    <Setter Property="Foreground" Value="White"/>
-                                                </Trigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </DataGrid.RowStyle>
-                                    
-                                    <!-- 헤더 스타일 -->
-                                    <DataGrid.ColumnHeaderStyle>
-                                        <Style TargetType="DataGridColumnHeader">
-                                            <Setter Property="Background" Value="#27AE60"/>
-                                            <Setter Property="Foreground" Value="White"/>
-                                            <Setter Property="FontWeight" Value="Bold"/>
-                                            <Setter Property="Padding" Value="10,8"/>
-                                            <Setter Property="BorderThickness" Value="0,0,1,0"/>
-                                            <Setter Property="BorderBrush" Value="#229954"/>
-                                        </Style>
-                                    </DataGrid.ColumnHeaderStyle>
-                                </DataGrid>
-                            </Grid>
-                        </Border>
-                        
-                        <!-- 스플리터 -->
-                        <GridSplitter Grid.Column="1" 
-                                     Background="#BDC3C7" 
-                                     HorizontalAlignment="Stretch"/>
-                        
-                        <!-- 프리셋 미리보기 패널 -->
-                        <Border Grid.Column="2" Background="White" CornerRadius="5" Margin="0,0,0,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                
-                                <!-- 미리보기 헤더 -->
-                                <TextBlock Grid.Row="0" 
-                                          Text="👁️ 프리셋 미리보기" 
-                                          FontWeight="Bold" 
-                                          FontSize="16" 
-                                          Margin="15,15,15,10"/>
-                                
-                                <!-- 미리보기 내용 -->
-                                <ScrollViewer Grid.Row="1" Margin="15,0,15,0" VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Name="PresetPreviewPanel">
-                                        <!-- 선택된 프리셋이 없을 때 -->
-                                        <TextBlock Name="NoPresetSelectedText"
-                                                  Text="프리셋을 선택하세요" 
-                                                  HorizontalAlignment="Center" 
-                                                  VerticalAlignment="Center" 
-                                                  FontSize="14" 
-                                                  Foreground="#7F8C8D"
-                                                  Margin="0,50,0,0"/>
-                                        
-                                        <!-- 선택된 프리셋 정보 -->
-                                        <StackPanel Name="PresetInfoPanel" Visibility="Collapsed">
-                                            <!-- 기본 정보 -->
-                                            <Border Background="#F8F9FA" Padding="10" CornerRadius="5" Margin="0,0,0,10">
-                                                <StackPanel>
-                                                    <TextBlock Name="PresetNameText" 
-                                                              FontWeight="Bold" 
-                                                              FontSize="16" 
-                                                              Margin="0,0,0,5"/>
-                                                    <TextBlock Name="PresetDescriptionText" 
-                                                              TextWrapping="Wrap" 
-                                                              Margin="0,0,0,5"/>
-                                                    <TextBlock Name="PresetCreatedText" 
-                                                              FontSize="12" 
-                                                              Foreground="#7F8C8D"/>
-                                                </StackPanel>
-                                            </Border>
-                                            
-                                            <!-- 포함된 매크로 목록 -->
-                                            <TextBlock Text="📦 포함된 매크로" FontWeight="Bold" Margin="0,0,0,10"/>
-                                            <ListBox Name="PresetMacroListBox" 
-                                                    Height="200"
-                                                    BorderThickness="1"
-                                                    BorderBrush="#DEE2E6"
-                                                    Background="#FAFAFA">
-                                                <ListBox.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <StackPanel Orientation="Horizontal" Margin="5">
-                                                            <TextBlock Text="🎮" Margin="0,0,5,0"/>
-                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Margin="0,0,10,0"/>
-                                                            <TextBlock Text="{Binding VoiceCommand}" 
-                                                                      Foreground="#6C757D" 
-                                                                      FontStyle="Italic"/>
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </ListBox.ItemTemplate>
-                                            </ListBox>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </ScrollViewer>
-                                
-                                <!-- 미리보기 하단 버튼 -->
-                                <Border Grid.Row="2" Background="#F8F9FA" Padding="15" CornerRadius="0,0,5,5">
-                                    <StackPanel Name="PresetPreviewActions" Visibility="Collapsed">
-                                        <Button Name="QuickApplyButton"
-                                               Content="⚡ 빠른 적용" 
-                                               Padding="10,8" 
-                                               Background="#27AE60" 
-                                               Foreground="White" 
-                                               BorderThickness="0"
-                                               FontWeight="Bold"
-                                               Margin="0,0,0,5"
-                                               Click="QuickApplyButton_Click"/>
-                                        <Button Name="QuickFavoriteButton"
-                                               Content="⭐ 즐겨찾기 토글" 
-                                               Padding="10,8" 
-                                               Background="#F39C12" 
-                                               Foreground="White" 
-                                               BorderThickness="0"
-                                               Click="QuickFavoriteButton_Click"/>
-                                    </StackPanel>
-                                </Border>
-                            </Grid>
-                        </Border>
-                    </Grid>
-                    
-                    <!-- 하단 상태 및 통계 정보 -->
-                    <Border Grid.Row="3" Background="White" Padding="15,10,0,0" CornerRadius="5">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            
-                            <!-- 통계 정보 표시 -->
-                            <StackPanel Grid.Column="0">
-                                <TextBlock Text="📊 전체 프리셋" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="TotalPresetsText" Text="0개" FontSize="20" Foreground="#2ECC71"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Text="⭐ 즐겨찾기" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="FavoritePresetsText" Text="0개" FontSize="20" Foreground="#F39C12"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Text="📈 즐겨찾기 비율" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="FavoritePercentageText" Text="0%" FontSize="20" Foreground="#3498DB"/>
-                            </StackPanel>
-                            
-                            <StackPanel Grid.Column="3">
-                                <TextBlock Text="🕒 최근 프리셋" FontWeight="Bold" Margin="0,0,0,5"/>
-                                <TextBlock Name="RecentPresetText" Text="없음" FontSize="14" Foreground="#7F8C8D"/>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </Grid>
-            </TabItem>
-            
-            <!-- 개발자 정보 탭 -->
-            <TabItem Header="💻 개발자 정보" FontSize="14" Padding="15,10">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="20">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-                        
-                        <!-- 프로그램 정보 섹션 -->
-                        <Border Grid.Row="0" Background="White" Padding="25" Margin="0,0,0,20" CornerRadius="10" 
-                               BorderThickness="1" BorderBrush="#E1E8ED">
-                            <StackPanel>
-                                <TextBlock Text="🎮 VoiceMacro Pro" 
-                                          FontSize="32" 
-                                          FontWeight="Bold" 
-                                          Foreground="#2C3E50" 
-                                          HorizontalAlignment="Center"
-                                          Margin="0,0,0,10"/>
-                                
-                                <TextBlock Text="게임 AI 음성 매크로 프로그램" 
-                                          FontSize="18" 
-                                          Foreground="#7F8C8D" 
-                                          HorizontalAlignment="Center"
-                                          Margin="0,0,0,15"/>
-                                
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="버전: " FontWeight="Bold" Foreground="#34495E"/>
-                                    <TextBlock Text="1.0.0" Foreground="#3498DB" FontWeight="Bold"/>
-                                    <TextBlock Text=" | " Margin="10,0" Foreground="#BDC3C7"/>
-                                    <TextBlock Text="빌드: " FontWeight="Bold" Foreground="#34495E"/>
-                                    <TextBlock Text="2025.01.17" Foreground="#E67E22" FontWeight="Bold"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        
-                        <!-- 카피라이트 정보 -->
-                        <Border Grid.Row="1" Background="#F8F9FA" Padding="20" Margin="0,0,0,20" CornerRadius="8">
-                            <StackPanel>
-                                <TextBlock Text="📄 저작권 정보" 
-                                          FontSize="18" 
-                                          FontWeight="Bold" 
-                                          Foreground="#2C3E50" 
-                                          Margin="0,0,0,15"/>
-                                
-                                <TextBlock Text="© 2025 VoiceMacro Pro Development Team. All Rights Reserved." 
-                                          FontSize="14" 
-                                          Foreground="#34495E"
-                                          Margin="0,0,0,8"/>
-                                
-                                <TextBlock Text="본 소프트웨어는 저작권법에 의해 보호받습니다." 
-                                          FontSize="12" 
-                                          Foreground="#7F8C8D"
-                                          Margin="0,0,0,5"/>
-                                
-                                <TextBlock Text="무단 복제, 배포, 수정을 금지합니다." 
-                                          FontSize="12" 
-                                          Foreground="#7F8C8D"/>
-                            </StackPanel>
-                        </Border>
-                        
-                        <!-- 기술 스택 정보 -->
-                        <Border Grid.Row="2" Background="White" Padding="20" Margin="0,0,0,20" CornerRadius="8"
-                               BorderThickness="1" BorderBrush="#E1E8ED">
-                            <StackPanel>
-                                <TextBlock Text="🛠️ 기술 스택" 
-                                          FontSize="18" 
-                                          FontWeight="Bold" 
-                                          Foreground="#2C3E50" 
-                                          Margin="0,0,0,15"/>
-                                
-                                <!-- 프론트엔드 기술 -->
-                                <StackPanel Margin="0,0,0,15">
-                                    <TextBlock Text="💻 프론트엔드" FontWeight="Bold" FontSize="14" Foreground="#3498DB" Margin="0,0,0,8"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        
-                                        <Border Grid.Column="0" Background="#F0F8FF" Padding="10" Margin="0,0,5,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="⚡" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="C# WPF" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text=".NET 6.0" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
-                                        <Border Grid.Column="1" Background="#FFF5F5" Padding="10" Margin="2.5,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🎨" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="XAML" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="UI Layout" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
-                                        <Border Grid.Column="2" Background="#F0FFF0" Padding="10" Margin="5,0,0,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🔗" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="HTTP API" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="REST Client" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </StackPanel>
-                                
-                                <!-- 백엔드 기술 -->
-                                <StackPanel Margin="0,0,0,15">
-                                    <TextBlock Text="🐍 백엔드" FontWeight="Bold" FontSize="14" Foreground="#E74C3C" Margin="0,0,0,8"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        
-                                        <Border Grid.Column="0" Background="#FFF8DC" Padding="10" Margin="0,0,5,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🐍" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="Python" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="3.9+" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
-                                        <Border Grid.Column="1" Background="#F0F8FF" Padding="10" Margin="2.5,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🌐" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="Flask" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="API Server" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
-                                        <Border Grid.Column="2" Background="#FFF0F5" Padding="10" Margin="5,0,0,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🤖" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="PyAutoGUI" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="Automation" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </StackPanel>
-                                
-                                <!-- AI & 데이터베이스 -->
-                                <StackPanel>
-                                    <TextBlock Text="🧠 AI &amp; 데이터베이스" FontWeight="Bold" FontSize="14" Foreground="#9B59B6" Margin="0,0,0,8"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        
-                                        <Border Grid.Column="0" Background="#F5F0FF" Padding="10" Margin="0,0,5,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🎙️" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="Whisper AI" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="OpenAI" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
-                                        <Border Grid.Column="1" Background="#F8F8FF" Padding="10" Margin="2.5,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="🗄️" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="SQLite" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="Database" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        
-                                        <Border Grid.Column="2" Background="#FFF8F0" Padding="10" Margin="5,0,0,0" CornerRadius="5">
-                                            <StackPanel HorizontalAlignment="Center">
-                                                <TextBlock Text="📊" FontSize="24" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="JSON" FontWeight="Bold" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="Data Format" FontSize="10" Foreground="#7F8C8D" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        
-                        <!-- 개발팀 정보 -->
-                        <Border Grid.Row="3" Background="#F8F9FA" Padding="20" Margin="0,0,0,20" CornerRadius="8">
-                            <StackPanel>
-                                <TextBlock Text="👥 개발팀 정보" 
-                                          FontSize="18" 
-                                          FontWeight="Bold" 
-                                          Foreground="#2C3E50" 
-                                          Margin="0,0,0,15"/>
-                                
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <!-- 개발자 정보 -->
-                                    <StackPanel Grid.Column="0" Margin="0,0,15,0">
-                                        <Border Background="White" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="#E1E8ED">
-                                            <StackPanel>
-                                                <TextBlock Text="💻 Lead Developer" FontWeight="Bold" FontSize="14" Foreground="#3498DB" Margin="0,0,0,8"/>
-                                                <TextBlock Text="이름: 홍길동" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                                                <TextBlock Text="이메일: example@email.com" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                                                <TextBlock Text="🎁 후원 계좌" FontWeight="Bold" FontSize="12" Foreground="#E67E22" Margin="0,5,0,5"/>
-                                                <TextBlock Text="카카오뱅크: 1234-56-7890123" FontSize="11" Foreground="#7F8C8D" Margin="0,0,0,2"/>
-                                                <TextBlock Text="토스뱅크: 1234567890" FontSize="11" Foreground="#7F8C8D"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </StackPanel>
-                                    <!-- 프로젝트 정보 -->
-                                    <StackPanel Grid.Column="1">
-                                        <Border Background="White" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="#E1E8ED">
-                                            <StackPanel>
-                                                <TextBlock Text="📊 프로젝트 통계" FontWeight="Bold" FontSize="14" Foreground="#E74C3C" Margin="0,0,0,8"/>
-                                                <TextBlock Text="개발 기간: 2024.12 ~ 2025.01" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                                                <TextBlock Text="코드 라인: 3,000+ lines" FontSize="11" Foreground="#34495E" Margin="0,0,0,5"/>
-                                                <TextBlock Text="구현 기능: 5개 주요 모듈" FontSize="11" Foreground="#34495E"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                        
-                        <!-- 특별 감사 -->
-                        <Border Grid.Row="4" Background="White" Padding="20" Margin="0,0,0,20" CornerRadius="8"
-                               BorderThickness="1" BorderBrush="#E1E8ED">
-                            <StackPanel>
-                                <TextBlock Text="🙏 Special Thanks" 
-                                          FontSize="18" 
-                                          FontWeight="Bold" 
-                                          Foreground="#2C3E50" 
-                                          Margin="0,0,0,15"/>
-                                
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    
-                                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
-                                        <TextBlock Text="🤖 OpenAI" FontWeight="Bold" FontSize="14" Foreground="#00A67C" Margin="0,0,0,5"/>
-                                        <TextBlock Text="Whisper AI 음성 인식 모델 제공" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
-                                        <TextBlock Text="🐍 Python Community" FontWeight="Bold" FontSize="14" Foreground="#3776AB" Margin="0,0,0,5"/>
-                                        <TextBlock Text="강력한 오픈소스 라이브러리 생태계" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                    
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="🎮 Gaming Community" FontWeight="Bold" FontSize="14" Foreground="#FF6B35" Margin="0,0,0,5"/>
-                                        <TextBlock Text="테스트 및 피드백 제공" FontSize="11" Foreground="#7F8C8D" TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-                        
-                        <!-- 라이선스 및 법적 고지 -->
-                        <Border Grid.Row="5" Background="#2C3E50" Padding="20" CornerRadius="8">
-                            <StackPanel>
-                                <TextBlock Text="⚖️ 라이선스 및 법적 고지" 
-                                          FontSize="16" 
-                                          FontWeight="Bold" 
-                                          Foreground="White" 
-                                          Margin="0,0,0,15"/>
-                                
-                                <TextBlock Text="• 본 소프트웨어는 교육 및 개인 사용 목적으로 제공됩니다." 
-                                          FontSize="12" 
-                                          Foreground="#BDC3C7" 
-                                          Margin="0,0,0,5"/>
-                                
-                                <TextBlock Text="• 상업적 사용 시 별도 라이선스가 필요합니다." 
-                                          FontSize="12" 
-                                          Foreground="#BDC3C7" 
-                                          Margin="0,0,0,5"/>
-                                
-                                <TextBlock Text="• 게임 이용약관 및 관련 법규를 준수하여 사용하시기 바랍니다." 
-                                          FontSize="12" 
-                                          Foreground="#BDC3C7" 
-                                          Margin="0,0,0,5"/>
-                                
-                                <TextBlock Text="• 사용자의 부적절한 사용으로 인한 책임은 사용자에게 있습니다." 
-                                          FontSize="12" 
-                                          Foreground="#BDC3C7" 
-                                          Margin="0,0,0,10"/>
-                                
-                                <TextBlock Text="📧 Contact: voicemacro.pro@example.com" 
-                                          FontSize="12" 
-                                          Foreground="#3498DB" 
-                                          FontWeight="Bold"
-                                          HorizontalAlignment="Center"
-                                          Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </ScrollViewer>
-            </TabItem>
-
-        </TabControl>
-        
-        <!-- 하단 상태 표시줄 -->
-        <Border Grid.Row="2" Background="#34495E" Padding="15,8">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <!-- 하단 상태 표시줄 -->
+            <Border Grid.Row="2" Background="White" Padding="20,15,15,15" CornerRadius="10">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Color="#E0E6ED" Opacity="0.3"/>
+                </Border.Effect>
                 
-                <TextBlock Name="StatusTextBlock" 
-                          Grid.Column="0"
-                          Text="준비" 
-                          Foreground="White" 
-                          VerticalAlignment="Center"/>
-                
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <Ellipse Name="ServerStatusIndicator" 
-                            Width="12" 
-                            Height="12" 
-                            Fill="Red" 
-                            Margin="0,0,8,0"/>
-                    <TextBlock Name="ServerStatusText" 
-                              Text="서버 연결 확인 중..." 
-                              Foreground="White" 
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBlock Name="MainStatusText" 
+                              Grid.Column="0"
+                              Text="시스템 준비 완료" 
+                              FontSize="14" 
+                              Foreground="#4A5568" 
                               VerticalAlignment="Center"/>
-                </StackPanel>
-            </Grid>
-        </Border>
+                    
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,20,0">
+                        <TextBlock Text="📈" FontSize="14" Margin="0,0,5,0"/>
+                        <TextBlock Name="PerformanceStatusText" 
+                                  Text="성능: 양호" 
+                                  FontSize="12" 
+                                  Foreground="#38A169" 
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <Ellipse Name="MainServerIndicator" 
+                                Width="8" 
+                                Height="8" 
+                                Fill="#38A169" 
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Name="MainServerStatus" 
+                                  Text="서버 연결됨" 
+                                  FontSize="12" 
+                                  Foreground="#38A169" 
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
+    
+    <!-- 윈도우 리소스에 스타일 정의 -->
+    <Window.Resources>
+        <!-- 사이드바 메뉴 버튼 스타일 -->
+        <Style x:Key="SidebarMenuButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,15"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="ButtonBorder" 
+                               Background="{TemplateBinding Background}" 
+                               CornerRadius="8" 
+                               Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" 
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#5A9BF8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#2563EB"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- 헤더 아이콘 버튼 스타일 -->
+        <Style x:Key="HeaderIconButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#F7FAFC"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Name="ButtonBorder" 
+                               Background="{TemplateBinding Background}" 
+                               BorderBrush="{TemplateBinding BorderBrush}"
+                               BorderThickness="{TemplateBinding BorderThickness}"
+                               CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#EDF2F7"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#CBD5E0"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#E2E8F0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
 </Window> 

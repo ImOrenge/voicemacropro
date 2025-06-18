@@ -53,6 +53,10 @@ namespace VoiceMacroPro
         private bool _isEditingScript = false;
         private int _editingScriptId = 0;
 
+        // ==================== 대시보드 네비게이션 관련 필드 ====================
+        private string _currentSection = "Dashboard";
+        private DashboardView? _dashboardView = null;
+
         /// <summary>
         /// 메인 윈도우 생성자
         /// API 서비스를 초기화하고 UI를 설정합니다.
@@ -135,6 +139,10 @@ namespace VoiceMacroPro
                 // 음성 인식 UI 초기화 (UI 요소들이 모두 로드된 후)
                 InitializeVoiceRecognitionUI();
                 System.Diagnostics.Debug.WriteLine("음성 인식 UI 초기화 완료");
+                
+                // 대시보드 초기 로드
+                NavigateToSection("Dashboard");
+                System.Diagnostics.Debug.WriteLine("대시보드 초기 로드 완료");
                 
                 UpdateStatusText("준비 완료");
                 _loggingService.LogInfo("애플리케이션 초기화가 완료되었습니다.");
@@ -2481,6 +2489,413 @@ action ""기본 공격"" {
         {
             // TODO: 실시간 문법 하이라이팅 구현 (향후 개선사항)
             // 현재는 단순히 변경을 감지만 함
+        }
+
+        // ==================== 대시보드 네비게이션 메서드들 ====================
+
+        /// <summary>
+        /// 사이드바 메뉴 버튼 클릭 시 해당 섹션으로 네비게이션하는 메서드
+        /// </summary>
+        private void NavigateToSection(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (sender is Button button)
+                {
+                    string section = button.Tag?.ToString() ?? "Dashboard";
+                    NavigateToSection(section);
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"네비게이션 오류: {ex.Message}");
+                MessageBox.Show($"페이지 이동 중 오류가 발생했습니다: {ex.Message}", "오류", 
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 지정된 섹션으로 네비게이션하는 메서드
+        /// </summary>
+        /// <param name="section">이동할 섹션 이름</param>
+        private void NavigateToSection(string section)
+        {
+            try
+            {
+                _currentSection = section;
+                
+                // 페이지 제목과 경로 업데이트
+                UpdatePageHeader(section);
+                
+                // 메인 콘텐츠 영역에 해당 뷰 로드
+                LoadSectionContent(section);
+                
+                // 사이드바 메뉴 활성 상태 업데이트
+                UpdateSidebarSelection(section);
+                
+                _loggingService.LogInfo($"페이지 이동: {section}");
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"섹션 네비게이션 오류: {ex.Message}");
+                MessageBox.Show($"페이지 로드 중 오류가 발생했습니다: {ex.Message}", "오류", 
+                              MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// 페이지 헤더 정보를 업데이트하는 메서드
+        /// </summary>
+        private void UpdatePageHeader(string section)
+        {
+            if (PageTitleText != null && PageBreadcrumbText != null)
+            {
+                switch (section)
+                {
+                    case "Dashboard":
+                        PageTitleText.Text = "대시보드";
+                        PageBreadcrumbText.Text = "홈 > 대시보드";
+                        break;
+                    case "MacroManagement":
+                        PageTitleText.Text = "매크로 관리";
+                        PageBreadcrumbText.Text = "홈 > 매크로 관리";
+                        break;
+                    case "CustomScripting":
+                        PageTitleText.Text = "커스텀 스크립팅";
+                        PageBreadcrumbText.Text = "홈 > 커스텀 스크립팅";
+                        break;
+                    case "VoiceRecognition":
+                        PageTitleText.Text = "음성 인식";
+                        PageBreadcrumbText.Text = "홈 > 음성 인식";
+                        break;
+                    case "LogMonitoring":
+                        PageTitleText.Text = "로그 및 모니터링";
+                        PageBreadcrumbText.Text = "홈 > 로그 및 모니터링";
+                        break;
+                    case "PresetManagement":
+                        PageTitleText.Text = "프리셋 관리";
+                        PageBreadcrumbText.Text = "홈 > 프리셋 관리";
+                        break;
+                    case "DeveloperInfo":
+                        PageTitleText.Text = "개발자 정보";
+                        PageBreadcrumbText.Text = "홈 > 개발자 정보";
+                        break;
+                    default:
+                        PageTitleText.Text = "대시보드";
+                        PageBreadcrumbText.Text = "홈 > 대시보드";
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 선택된 섹션에 해당하는 콘텐츠를 로드하는 메서드
+        /// </summary>
+        private void LoadSectionContent(string section)
+        {
+            if (MainContentPresenter == null) return;
+
+            try
+            {
+                switch (section)
+                {
+                    case "Dashboard":
+                        if (_dashboardView == null)
+                        {
+                            _dashboardView = new DashboardView();
+                        }
+                        else
+                        {
+                            _dashboardView.RefreshDashboard();
+                        }
+                        MainContentPresenter.Content = _dashboardView;
+                        break;
+                        
+                    case "MacroManagement":
+                        // 기존 매크로 관리 UI를 UserControl로 만들어야 함 (추후 구현)
+                        MainContentPresenter.Content = CreatePlaceholderContent("매크로 관리", "📋", "매크로 CRUD 기능이 여기에 표시됩니다.");
+                        break;
+                        
+                    case "CustomScripting":
+                        // 기존 커스텀 스크립팅 UI를 UserControl로 만들어야 함 (추후 구현)
+                        MainContentPresenter.Content = CreatePlaceholderContent("커스텀 스크립팅", "🔧", "MSL 스크립트 에디터가 여기에 표시됩니다.");
+                        break;
+                        
+                    case "VoiceRecognition":
+                        // 기존 음성 인식 UI를 UserControl로 만들어야 함 (추후 구현)
+                        MainContentPresenter.Content = CreatePlaceholderContent("음성 인식", "🎤", "음성 인식 및 매크로 매칭 기능이 여기에 표시됩니다.");
+                        break;
+                        
+                    case "LogMonitoring":
+                        // 기존 로그 UI를 UserControl로 만들어야 함 (추후 구현)
+                        MainContentPresenter.Content = CreatePlaceholderContent("로그 및 모니터링", "📊", "실시간 로그 및 시스템 모니터링이 여기에 표시됩니다.");
+                        break;
+                        
+                    case "PresetManagement":
+                        // 기존 프리셋 관리 UI를 UserControl로 만들어야 함 (추후 구현)
+                        MainContentPresenter.Content = CreatePlaceholderContent("프리셋 관리", "📁", "프리셋 관리 기능이 여기에 표시됩니다.");
+                        break;
+                        
+                    case "DeveloperInfo":
+                        // 기존 개발자 정보 UI를 UserControl로 만들어야 함 (추후 구현)
+                        MainContentPresenter.Content = CreatePlaceholderContent("개발자 정보", "💻", "개발자 정보 및 라이선스가 여기에 표시됩니다.");
+                        break;
+                        
+                    default:
+                        if (_dashboardView == null)
+                        {
+                            _dashboardView = new DashboardView();
+                        }
+                        MainContentPresenter.Content = _dashboardView;
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"콘텐츠 로드 오류 ({section}): {ex.Message}");
+                MainContentPresenter.Content = CreateErrorContent(section, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// 임시 플레이스홀더 콘텐츠를 생성하는 메서드
+        /// </summary>
+        private UIElement CreatePlaceholderContent(string title, string icon, string description)
+        {
+            var border = new Border
+            {
+                Background = new SolidColorBrush(Colors.White),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(50),
+                Margin = new Thickness(0)
+            };
+            
+            border.Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 10,
+                ShadowDepth = 3,
+                Color = (Color)ColorConverter.ConvertFromString("#E0E6ED"),
+                Opacity = 0.2
+            };
+
+            var stackPanel = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var iconText = new TextBlock
+            {
+                Text = icon,
+                FontSize = 64,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 20)
+            };
+
+            var titleText = new TextBlock
+            {
+                Text = title,
+                FontSize = 24,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2D3748")),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            var descText = new TextBlock
+            {
+                Text = description,
+                FontSize = 14,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#718096")),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 400
+            };
+
+            var comingSoonText = new TextBlock
+            {
+                Text = "🚧 개발 중인 기능입니다 🚧",
+                FontSize = 12,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F56565")),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 20, 0, 0),
+                FontWeight = FontWeights.Medium
+            };
+
+            stackPanel.Children.Add(iconText);
+            stackPanel.Children.Add(titleText);
+            stackPanel.Children.Add(descText);
+            stackPanel.Children.Add(comingSoonText);
+            
+            border.Child = stackPanel;
+            return border;
+        }
+
+        /// <summary>
+        /// 오류 콘텐츠를 생성하는 메서드
+        /// </summary>
+        private UIElement CreateErrorContent(string section, string errorMessage)
+        {
+            var border = new Border
+            {
+                Background = new SolidColorBrush(Colors.White),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(50),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FED7D7")),
+                BorderThickness = new Thickness(1)
+            };
+
+            var stackPanel = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var iconText = new TextBlock
+            {
+                Text = "⚠️",
+                FontSize = 48,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+
+            var titleText = new TextBlock
+            {
+                Text = $"{section} 로드 오류",
+                FontSize = 20,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E53E3E")),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+
+            var errorText = new TextBlock
+            {
+                Text = errorMessage,
+                FontSize = 12,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#718096")),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 500
+            };
+
+            stackPanel.Children.Add(iconText);
+            stackPanel.Children.Add(titleText);
+            stackPanel.Children.Add(errorText);
+            
+            border.Child = stackPanel;
+            return border;
+        }
+
+        /// <summary>
+        /// 사이드바 메뉴의 선택 상태를 업데이트하는 메서드
+        /// </summary>
+        private void UpdateSidebarSelection(string section)
+        {
+            // 모든 메뉴 버튼의 스타일을 기본으로 리셋
+            ResetSidebarButtonStyles();
+            
+            // 선택된 메뉴 버튼을 활성 상태로 변경
+            Button? activeButton = section switch
+            {
+                "Dashboard" => DashboardMenuButton,
+                "MacroManagement" => MacroManagementMenuButton,
+                "CustomScripting" => CustomScriptingMenuButton,
+                "VoiceRecognition" => VoiceRecognitionMenuButton,
+                "LogMonitoring" => LogMonitoringMenuButton,
+                "PresetManagement" => PresetManagementMenuButton,
+                "DeveloperInfo" => DeveloperInfoMenuButton,
+                _ => DashboardMenuButton
+            };
+
+            if (activeButton != null)
+            {
+                activeButton.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2563EB"));
+            }
+        }
+
+        /// <summary>
+        /// 사이드바 버튼 스타일을 기본 상태로 리셋하는 메서드
+        /// </summary>
+        private void ResetSidebarButtonStyles()
+        {
+            var transparentBrush = new SolidColorBrush(Colors.Transparent);
+            
+            if (DashboardMenuButton != null) DashboardMenuButton.Background = transparentBrush;
+            if (MacroManagementMenuButton != null) MacroManagementMenuButton.Background = transparentBrush;
+            if (CustomScriptingMenuButton != null) CustomScriptingMenuButton.Background = transparentBrush;
+            if (VoiceRecognitionMenuButton != null) VoiceRecognitionMenuButton.Background = transparentBrush;
+            if (LogMonitoringMenuButton != null) LogMonitoringMenuButton.Background = transparentBrush;
+            if (PresetManagementMenuButton != null) PresetManagementMenuButton.Background = transparentBrush;
+            if (DeveloperInfoMenuButton != null) DeveloperInfoMenuButton.Background = transparentBrush;
+        }
+
+        // ==================== 대시보드에서 호출할 수 있는 공개 네비게이션 메서드들 ====================
+
+        /// <summary>
+        /// 매크로 관리 페이지로 이동하는 공개 메서드
+        /// </summary>
+        public void NavigateToMacroManagement()
+        {
+            NavigateToSection("MacroManagement");
+        }
+
+        /// <summary>
+        /// 커스텀 스크립팅 페이지로 이동하는 공개 메서드
+        /// </summary>
+        public void NavigateToCustomScripting()
+        {
+            NavigateToSection("CustomScripting");
+        }
+
+        /// <summary>
+        /// 음성 인식 페이지로 이동하는 공개 메서드
+        /// </summary>
+        public void NavigateToVoiceRecognition()
+        {
+            NavigateToSection("VoiceRecognition");
+        }
+
+        /// <summary>
+        /// 로그 및 모니터링 페이지로 이동하는 공개 메서드
+        /// </summary>
+        public void NavigateToLogMonitoring()
+        {
+            NavigateToSection("LogMonitoring");
+        }
+
+        /// <summary>
+        /// 프리셋 관리 페이지로 이동하는 공개 메서드
+        /// </summary>
+        public void NavigateToPresetManagement()
+        {
+            NavigateToSection("PresetManagement");
+        }
+
+        // ==================== 헤더 검색 및 기타 UI 이벤트 핸들러들 ====================
+
+        /// <summary>
+        /// 글로벌 검색 박스 포커스 이벤트 핸들러
+        /// </summary>
+        private void GlobalSearchBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.Text == "검색...")
+            {
+                textBox.Text = "";
+                textBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2D3748"));
+            }
+        }
+
+        /// <summary>
+        /// 글로벌 검색 박스 포커스 해제 이벤트 핸들러
+        /// </summary>
+        private void GlobalSearchBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox && string.IsNullOrWhiteSpace(textBox.Text))
+            {
+                textBox.Text = "검색...";
+                textBox.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A0AEC0"));
+            }
         }
     }
 } 
