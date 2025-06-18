@@ -236,7 +236,6 @@
 | `~` | 토글 | `~CapsLock` | CapsLock ON/OFF 전환 |
 | `*` | 반복 | `W*5` | W키를 5번 반복 |
 | `&` | 연속 입력 | `Space&100` | Space를 100ms 간격으로 연속 입력 |
-| `%` | 확률 실행 | `W%50` | 50% 확률로 W키 실행 |
 
 ##### **타이밍 제어**
 
@@ -279,8 +278,8 @@ Shift[2000]+(W,A,S,D)
 # 반복 실행
 Space*10{50}
 
-# 확률적 실행 (크리티컬 스킬)
-CriticalSkill%30
+# 연속 입력 (빠른 공격)
+Attack&50
 
 # 토글 기능
 ~CapsLock,(W,A,S,D),~CapsLock
@@ -292,7 +291,7 @@ CriticalSkill%30
 Down+Forward,Punch(50)Kick(100)*3
 
 # MMO 스킬 로테이션
-Skill1(1000)Skill2(800)Skill3(1200)Buff%20
+Skill1(1000)Skill2(800)Skill3(1200)Buff
 
 # FPS 리코일 제어
 MouseDown[100]@(0,-5)@(0,-3)@(0,-2)MouseUp
@@ -644,7 +643,7 @@ CREATE INDEX idx_script_performance_analysis_script_id ON script_performance_ana
 - **기본 연산자**: `,`, `+`, `>`, `*`, `()`, `[]` 구현
 
 #### 5.6.3 3주차: 고급 기능 및 통합
-- **고급 연산자**: `|`, `~`, `&`, `%`, `<>` 구현
+- **고급 연산자**: `|`, `~`, `&`, `<>` 구현
 - **변수 시스템**: 전역/지역 변수, 타입 시스템
 - **템플릿 시스템**: 게임별 템플릿, 라이브러리
 - **성능 최적화**: 컴파일 캐싱, 실행 최적화
