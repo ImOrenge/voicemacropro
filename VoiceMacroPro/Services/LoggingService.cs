@@ -7,6 +7,8 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Text;
+using System.Linq;
 
 namespace VoiceMacroPro.Services
 {
@@ -307,46 +309,86 @@ namespace VoiceMacroPro.Services
         }
 
         /// <summary>
-        /// 현재 로그를 파일로 내보내기
+        /// 로그를 파일로 내보내는 메서드
         /// </summary>
-        /// <param name="filePath">내보낼 파일 경로</param>
-        /// <returns>성공 여부</returns>
-        public async Task<bool> ExportLogsAsync(string filePath)
+        /// <param name="filePath">저장할 파일 경로</param>
+        public async Task ExportLogsAsync(string filePath)
         {
             try
             {
-                var logLines = new List<string>();
+                var logs = LogEntries.ToList();
+                var content = new StringBuilder();
                 
-                Application.Current?.Dispatcher.Invoke(() =>
-                {
-                    foreach (var entry in LogEntries)
-                    {
-                        logLines.Add(entry.FullText);
-                    }
-                });
+                // 헤더 추가
+                content.AppendLine("VoiceMacro Pro 로그 내보내기");
+                content.AppendLine($"내보낸 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                content.AppendLine($"총 로그 개수: {logs.Count}");
+                content.AppendLine(new string('=', 50));
+                content.AppendLine();
 
-                await File.WriteAllLinesAsync(filePath, logLines);
-                LogInfo($"로그가 성공적으로 내보내졌습니다: {filePath}");
-                return true;
+                // 로그 엔트리들 추가
+                foreach (var log in logs.OrderBy(l => l.Timestamp))
+                {
+                    content.AppendLine($"[{log.TimeText}] [{log.LevelText}] {log.Message}");
+                    if (log.MacroId.HasValue)
+                    {
+                        content.AppendLine($"  - 매크로 ID: {log.MacroId}");
+                    }
+                    content.AppendLine();
+                }
+
+                await File.WriteAllTextAsync(filePath, content.ToString(), Encoding.UTF8);
+                LogInfo($"로그가 파일로 내보내졌습니다: {filePath}");
             }
             catch (Exception ex)
             {
-                LogError($"로그 내보내기 실패: {ex.Message}", ex);
-                return false;
+                LogError($"로그 내보내기 실패: {ex.Message}");
+                throw;
             }
         }
 
         /// <summary>
-        /// 모든 로그 항목을 지우는 메서드
+        /// 모든 로그를 지우는 메서드
         /// </summary>
         public void ClearLogs()
         {
-            Application.Current?.Dispatcher.Invoke(() =>
+            try
             {
+                var count = LogEntries.Count;
                 LogEntries.Clear();
-                OnPropertyChanged(nameof(TotalLogCount));
-            });
-            LogInfo("모든 로그가 지워졌습니다.");
+                
+                // 로그 삭제 후 시스템 메시지 추가
+                var clearMessage = new LogEntry
+                {
+                    Timestamp = DateTime.Now,
+                    Level = LogLevel.Info,
+                    Message = $"{count}개의 로그가 삭제되었습니다",
+                    MacroId = null
+                };
+                
+                LogEntries.Add(clearMessage);
+            }
+            catch (Exception ex)
+            {
+                LogError($"로그 삭제 실패: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 로그 엔트리를 제한된 개수로 유지하는 메서드
+        /// </summary>
+        private void TrimLogs()
+        {
+            const int maxLogEntries = 1000; // 최대 1000개 로그 유지
+            
+            if (LogEntries.Count > maxLogEntries)
+            {
+                var excessCount = LogEntries.Count - maxLogEntries;
+                for (int i = 0; i < excessCount; i++)
+                {
+                    LogEntries.RemoveAt(0); // 오래된 로그부터 제거
+                }
+            }
         }
 
         /// <summary>
@@ -391,11 +433,43 @@ namespace VoiceMacroPro.Services
             LogInfo($"매크로 매칭: '{voiceCommand}' → '{matchedMacro}' (유사도: {similarity:P1})");
         }
 
+        /// <summary>
+        /// 로그 레벨을 설정하는 메서드
+        /// </summary>
+        /// <param name="level">설정할 로그 레벨 (Debug, Info, Warning, Error)</param>
+        public void SetMinimumLevel(string level)
+        {
+            if (Enum.TryParse<LogLevel>(level, true, out var logLevel))
+            {
+                _currentLogLevel = logLevel;
+                LogInfo($"로그 레벨이 {level}로 변경되었습니다");
+            }
+            else
+            {
+                LogWarning($"알 수 없는 로그 레벨: {level}");
+            }
+        }
+
+        /// <summary>
+        /// 자동 스크롤 설정 메서드
+        /// </summary>
+        /// <param name="enabled">자동 스크롤 활성화 여부</param>
+        public void SetAutoScroll(bool enabled)
+        {
+            _isAutoScroll = enabled;
+            LogDebug($"자동 스크롤이 {(enabled ? "활성화" : "비활성화")}되었습니다");
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void Dispose()
+        {
+            // 필요시 리소스 정리
         }
     }
 } 

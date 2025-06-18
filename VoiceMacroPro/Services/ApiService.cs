@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using VoiceMacroPro.Models;
-using System.Text.Json.Serialization;
 
 namespace VoiceMacroPro.Services
 {
@@ -466,7 +469,8 @@ namespace VoiceMacroPro.Services
                             RecognizedText = apiResponse.Data.recognized_text?.ToString() ?? "",
                             MatchedMacros = JsonConvert.DeserializeObject<List<MacroMatch>>(
                                 apiResponse.Data.matched_macros?.ToString() ?? "[]") ?? new List<MacroMatch>(),
-                            ProcessingTime = (double)(apiResponse.Data.processing_time ?? 0.0)
+                            ProcessingTime = (double)(apiResponse.Data.processing_time ?? 0.0),
+                            AudioDuration = (double)(apiResponse.Data.audio_duration ?? 3.0)
                         };
                     }
                 }
@@ -971,6 +975,304 @@ namespace VoiceMacroPro.Services
         public void Dispose()
         {
             _httpClient?.Dispose();
+        }
+
+        /// <summary>
+        /// 음성 명령을 분석하여 매칭되는 매크로들을 반환하는 메서드
+        /// </summary>
+        /// <param name="recognizedText">인식된 음성 텍스트</param>
+        /// <returns>매칭된 매크로 결과 목록</returns>
+        public async Task<List<VoiceMatchResult>> AnalyzeVoiceCommandAsync(string recognizedText)
+        {
+            try
+            {
+                // 기존의 MatchMacrosAsync를 사용해서 VoiceMatchResult로 변환
+                var matches = await MatchMacrosAsync(recognizedText);
+                var results = new List<VoiceMatchResult>();
+                
+                for (int i = 0; i < matches.Count; i++)
+                {
+                    var match = matches[i];
+                    results.Add(new VoiceMatchResult
+                    {
+                        Rank = i + 1,
+                        MacroId = match.MacroId,
+                        MacroName = match.MacroName,
+                        VoiceCommand = match.VoiceCommand,
+                        ActionDescription = match.ActionDescription,
+                        Confidence = match.Confidence
+                        // ConfidenceText와 ConfidenceColor는 자동 계산됨
+                    });
+                }
+                
+                return results;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"음성 분석 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋 목록을 조회하는 메서드 (기존 메서드와 호환되도록 수정)
+        /// </summary>
+        /// <param name="searchTerm">검색어 (선택사항)</param>
+        /// <param name="favoritesOnly">즐겨찾기만 조회 여부</param>
+        /// <returns>프리셋 목록</returns>
+        public async Task<List<PresetModel>> GetPresetsNewAsync(string searchTerm = "", bool favoritesOnly = false)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets";
+                var queryParams = new List<string>();
+                
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                    queryParams.Add($"search={Uri.EscapeDataString(searchTerm)}");
+                
+                if (favoritesOnly)
+                    queryParams.Add("favorites_only=true");
+
+                if (queryParams.Any())
+                    url += "?" + string.Join("&", queryParams);
+
+                var response = await _httpClient.GetAsync(url);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<PresetModel>>>(responseContent);
+                    return apiResponse?.Data ?? new List<PresetModel>();
+                }
+                else
+                {
+                    throw new HttpRequestException($"프리셋 목록 조회 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 목록 조회 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// 특정 프리셋의 상세 정보를 조회하는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="presetId">프리셋 ID</param>
+        /// <returns>프리셋 상세 정보</returns>
+        public async Task<PresetModel?> GetPresetNewAsync(int presetId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets/{presetId}";
+                var response = await _httpClient.GetAsync(url);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<PresetModel>>(responseContent);
+                    return apiResponse?.Data;
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+                else
+                {
+                    throw new HttpRequestException($"프리셋 조회 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 조회 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+        
+        /// <summary>
+        /// 새 프리셋을 생성하는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="preset">생성할 프리셋 정보</param>
+        /// <returns>생성된 프리셋의 ID</returns>
+        public async Task<int> CreatePresetNewAsync(PresetModel preset)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets";
+                var json = JsonConvert.SerializeObject(preset);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync(url, content);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(responseContent);
+                    return (int)apiResponse?.Data?.id;
+                }
+                else
+                {
+                    throw new HttpRequestException($"프리셋 생성 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 생성 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋을 업데이트하는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="preset">업데이트할 프리셋 정보</param>
+        /// <returns>성공 여부</returns>
+        public async Task<bool> UpdatePresetNewAsync(PresetModel preset)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets/{preset.Id}";
+                var json = JsonConvert.SerializeObject(preset);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PutAsync(url, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+                else
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    throw new HttpRequestException($"프리셋 업데이트 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 업데이트 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋을 삭제하는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="presetId">삭제할 프리셋 ID</param>
+        /// <returns>성공 여부</returns>
+        public async Task<bool> DeletePresetNewAsync(int presetId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets/{presetId}";
+                var response = await _httpClient.DeleteAsync(url);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+                else
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    throw new HttpRequestException($"프리셋 삭제 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 삭제 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋을 적용하는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="presetId">적용할 프리셋 ID</param>
+        /// <returns>성공 여부</returns>
+        public async Task<bool> ApplyPresetNewAsync(int presetId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets/{presetId}/apply";
+                var content = new StringContent("{}", Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync(url, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+                else
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    throw new HttpRequestException($"프리셋 적용 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 적용 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋을 파일에서 가져오는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="filePath">가져올 파일 경로</param>
+        /// <returns>가져온 프리셋 개수</returns>
+        public async Task<int> ImportPresetNewAsync(string filePath)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets/import";
+                
+                // 파일 내용을 읽어서 전송
+                var fileContent = await File.ReadAllTextAsync(filePath);
+                var requestData = new { file_content = fileContent, file_name = Path.GetFileName(filePath) };
+                var json = JsonConvert.SerializeObject(requestData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await _httpClient.PostAsync(url, content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<int>>(responseContent);
+                    return apiResponse?.Data ?? 0;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    throw new HttpRequestException($"프리셋 가져오기 실패: {response.StatusCode} - {errorContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 가져오기 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프리셋을 파일로 내보내는 메서드 (기존 메서드와 호환)
+        /// </summary>
+        /// <param name="presetId">내보낼 프리셋 ID</param>
+        /// <param name="filePath">저장할 파일 경로</param>
+        /// <returns>성공 여부</returns>
+        public async Task<bool> ExportPresetNewAsync(int presetId, string filePath)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/presets/{presetId}/export";
+                var response = await _httpClient.GetAsync(url);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    await File.WriteAllTextAsync(filePath, responseContent);
+                    return true;
+                }
+                else
+                {
+                    throw new HttpRequestException($"프리셋 내보내기 실패: {response.StatusCode} - {responseContent}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"프리셋 내보내기 중 오류 발생: {ex.Message}", ex);
+            }
         }
     }
 

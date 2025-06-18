@@ -1885,13 +1885,14 @@
                                         <Border Background="White" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="#E1E8ED">
                                             <StackPanel>
                                                 <TextBlock Text="💻 Lead Developer" FontWeight="Bold" FontSize="14" Foreground="#3498DB" Margin="0,0,0,8"/>
-                                                <TextBlock Text="Senior Software Engineer" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
-                                                <TextBlock Text="전문 분야: AI/ML, Game Development" FontSize="11" Foreground="#34495E" Margin="0,0,0,5"/>
-                                                <TextBlock Text="경력: 5+ years" FontSize="11" Foreground="#34495E"/>
+                                                <TextBlock Text="이름: 홍길동" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                                                <TextBlock Text="이메일: example@email.com" FontSize="12" Foreground="#7F8C8D" Margin="0,0,0,5"/>
+                                                <TextBlock Text="🎁 후원 계좌" FontWeight="Bold" FontSize="12" Foreground="#E67E22" Margin="0,5,0,5"/>
+                                                <TextBlock Text="카카오뱅크: 1234-56-7890123" FontSize="11" Foreground="#7F8C8D" Margin="0,0,0,2"/>
+                                                <TextBlock Text="토스뱅크: 1234567890" FontSize="11" Foreground="#7F8C8D"/>
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
-                                    
                                     <!-- 프로젝트 정보 -->
                                     <StackPanel Grid.Column="1">
                                         <Border Background="White" Padding="15" CornerRadius="8" BorderThickness="1" BorderBrush="#E1E8ED">
