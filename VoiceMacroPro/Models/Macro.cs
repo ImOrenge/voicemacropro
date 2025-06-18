@@ -118,6 +118,36 @@ namespace VoiceMacroPro.Models
         public int UsageCount { get; set; }
 
         /// <summary>
+        /// 스크립트 언어 (기본값: MSL)
+        /// </summary>
+        [JsonProperty("script_language")]
+        public string ScriptLanguage { get; set; } = "MSL";
+
+        /// <summary>
+        /// 스크립트 기반 매크로 여부
+        /// </summary>
+        [JsonProperty("is_script")]
+        public bool IsScript { get; set; } = false;
+
+        /// <summary>
+        /// 스크립트 언어 버전
+        /// </summary>
+        [JsonProperty("script_version")]
+        public string ScriptVersion { get; set; } = "1.0";
+
+        /// <summary>
+        /// 평균 실행 시간 (밀리초)
+        /// </summary>
+        [JsonProperty("execution_time_avg")]
+        public double ExecutionTimeAvg { get; set; } = 0.0;
+
+        /// <summary>
+        /// 실행 성공률 (퍼센트)
+        /// </summary>
+        [JsonProperty("success_rate")]
+        public double SuccessRate { get; set; } = 100.0;
+
+        /// <summary>
         /// 생성 날짜를 DateTime으로 변환하여 반환하는 속성
         /// JSON 직렬화에서는 제외됩니다.
         /// </summary>
@@ -209,8 +239,29 @@ namespace VoiceMacroPro.Models
                 "hold" => "홀드",
                 "toggle" => "토글",
                 "repeat" => "반복",
-                _ => "알 수 없음"
+                "custom_script" => "커스텀",
+                _ => "기본"
             };
+        }
+
+        /// <summary>
+        /// 매크로 종류 표시 (기본/스크립트)
+        /// UI 바인딩용 읽기 전용 속성
+        /// </summary>
+        [JsonIgnore]
+        public string MacroTypeDisplay 
+        { 
+            get => IsScript ? "스크립트" : "기본"; 
+        }
+
+        /// <summary>
+        /// 매크로 종류별 색상
+        /// UI 바인딩용 읽기 전용 속성
+        /// </summary>
+        [JsonIgnore]
+        public string MacroTypeColor 
+        { 
+            get => IsScript ? "#9B59B6" : "#2C3E50"; 
         }
 
         /// <summary>

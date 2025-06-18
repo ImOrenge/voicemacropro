@@ -176,6 +176,17 @@
                                                    Binding="{Binding ActionType}" 
                                                    Width="100" 
                                                    IsReadOnly="True"/>
+                                <DataGridTextColumn Header="종류" 
+                                                   Binding="{Binding MacroTypeDisplay}" 
+                                                   Width="80" 
+                                                   IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{Binding MacroTypeColor}"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Header="생성일" 
                                                    Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd}}" 
                                                    Width="100" 

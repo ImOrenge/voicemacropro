@@ -53,7 +53,7 @@ class MacroService:
         """
         base_query = '''
         SELECT id, name, voice_command, action_type, key_sequence, 
-               settings, created_at, updated_at, usage_count
+               settings, created_at, updated_at, usage_count, is_script, script_language
         FROM macros
         '''
         
@@ -87,7 +87,9 @@ class MacroService:
                 'settings': json.loads(row[5]) if row[5] else {},
                 'created_at': row[6],
                 'updated_at': row[7],
-                'usage_count': row[8]
+                'usage_count': row[8],
+                'is_script': bool(row[9]) if len(row) > 9 and row[9] is not None else False,
+                'script_language': row[10] if len(row) > 10 else None
             }
             macros.append(macro)
         
@@ -103,7 +105,7 @@ class MacroService:
         """
         query = '''
         SELECT id, name, voice_command, action_type, key_sequence, 
-               settings, created_at, updated_at, usage_count
+               settings, created_at, updated_at, usage_count, is_script, script_language
         FROM macros WHERE id = ?
         '''
         
@@ -120,7 +122,9 @@ class MacroService:
                 'settings': json.loads(row[5]) if row[5] else {},
                 'created_at': row[6],
                 'updated_at': row[7],
-                'usage_count': row[8]
+                'usage_count': row[8],
+                'is_script': bool(row[9]) if len(row) > 9 and row[9] is not None else False,
+                'script_language': row[10] if len(row) > 10 else None
             }
         return None
     
@@ -216,6 +220,7 @@ class MacroService:
     def delete_macro(self, macro_id: int) -> bool:
         """
         매크로를 삭제하는 함수
+        커스텀 스크립트와 연결된 매크로인 경우 관련 스크립트도 함께 삭제합니다.
         Args:
             macro_id (int): 삭제할 매크로 ID
         Returns:
@@ -226,11 +231,27 @@ class MacroService:
         if not macro:
             return False
         
+        # 커스텀 스크립트 연결 여부 확인
+        script_query = "SELECT id FROM custom_scripts WHERE macro_id = ?"
+        script_rows = self.db.execute_query(script_query, (macro_id,))
+        
+        # 관련 커스텀 스크립트 삭제
+        if script_rows:
+            for script_row in script_rows:
+                script_id = script_row[0]
+                delete_script_query = "DELETE FROM custom_scripts WHERE id = ?"
+                self.db.execute_query(delete_script_query, (script_id,))
+                self._log_action("INFO", f"연결된 커스텀 스크립트 삭제: Script ID {script_id}", macro_id)
+        
+        # 매크로 삭제
         query = "DELETE FROM macros WHERE id = ?"
         self.db.execute_query(query, (macro_id,))
         
         # 로그 남기기
-        self._log_action("INFO", f"매크로 삭제: {macro['name']}", macro_id)
+        if script_rows:
+            self._log_action("INFO", f"매크로 삭제 (스크립트 포함): {macro['name']}", macro_id)
+        else:
+            self._log_action("INFO", f"매크로 삭제: {macro['name']}", macro_id)
         
         return True
     

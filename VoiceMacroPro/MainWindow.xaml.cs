@@ -215,6 +215,7 @@ namespace VoiceMacroPro
 
         /// <summary>
         /// 매크로 목록을 서버에서 불러와 DataGrid에 표시하는 함수
+        /// 커스텀 스크립트는 제외하고 기본 매크로만 로드합니다.
         /// </summary>
         private async Task LoadMacros()
         {
@@ -227,7 +228,10 @@ namespace VoiceMacroPro
                 UpdateStatusText("매크로 목록 로딩 중...");
                 
                 // API를 통해 매크로 목록 조회
-                _allMacros = await _apiService.GetMacrosAsync(_currentSearchTerm, _currentSortBy);
+                var allMacros = await _apiService.GetMacrosAsync(_currentSearchTerm, _currentSortBy);
+                
+                // 커스텀 스크립트가 아닌 기본 매크로만 필터링
+                _allMacros = allMacros.Where(m => !m.IsScript).ToList();
                 
                 // DataGrid에 바인딩
                 if (MacroDataGrid != null)
@@ -235,8 +239,8 @@ namespace VoiceMacroPro
                     MacroDataGrid.ItemsSource = _allMacros;
                 }
                 
-                _loggingService?.LogInfo($"매크로 목록 로드 완료: {_allMacros.Count}개 항목");
-                UpdateStatusText($"매크로 {_allMacros.Count}개 로드 완료");
+                _loggingService?.LogInfo($"기본 매크로 목록 로드 완료: {_allMacros.Count}개 항목 (전체 {allMacros.Count}개 중)");
+                UpdateStatusText($"기본 매크로 {_allMacros.Count}개 로드 완료");
             }
             catch (Exception ex)
             {
@@ -284,17 +288,43 @@ namespace VoiceMacroPro
         }
 
         /// <summary>
-        /// 매크로 목록에서 선택이 변경될 때 실행되는 이벤트 핸들러
-        /// 선택된 항목에 따라 버튼 활성화 상태를 변경합니다.
+        /// 매크로 DataGrid에서 선택이 변경될 때 실행되는 이벤트 핸들러
+        /// 커스텀 스크립트는 수정 불가능하도록 처리합니다.
         /// </summary>
         private void MacroDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             bool hasSelection = MacroDataGrid.SelectedItem != null;
             
-            // 선택된 항목이 있을 때만 수정/복사/삭제 버튼 활성화
-            EditMacroButton.IsEnabled = hasSelection;
-            CopyMacroButton.IsEnabled = hasSelection;
-            DeleteMacroButton.IsEnabled = hasSelection;
+            if (hasSelection && MacroDataGrid.SelectedItem is Macro selectedMacro)
+            {
+                // 커스텀 스크립트인 경우 수정 불가
+                bool isCustomScript = selectedMacro.IsScript;
+                
+                // 커스텀 스크립트가 아닌 경우에만 수정 가능
+                EditMacroButton.IsEnabled = !isCustomScript;
+                
+                // 복사와 삭제는 항상 가능
+                CopyMacroButton.IsEnabled = true;
+                DeleteMacroButton.IsEnabled = true;
+                
+                // 커스텀 스크립트인 경우 상태 메시지 업데이트
+                if (isCustomScript)
+                {
+                    UpdateStatusText("커스텀 스크립트는 '커스텀 스크립팅' 탭에서 수정하세요");
+                }
+                else
+                {
+                    UpdateStatusText($"선택됨: {selectedMacro.Name}");
+                }
+            }
+            else
+            {
+                // 선택된 항목이 없을 때 모든 버튼 비활성화
+                EditMacroButton.IsEnabled = false;
+                CopyMacroButton.IsEnabled = false;
+                DeleteMacroButton.IsEnabled = false;
+                UpdateStatusText("준비");
+            }
         }
 
         /// <summary>
@@ -340,6 +370,7 @@ namespace VoiceMacroPro
         /// <summary>
         /// 매크로 수정 버튼 클릭 이벤트 핸들러
         /// 선택된 매크로를 수정하기 위한 다이얼로그를 표시합니다.
+        /// 커스텀 스크립트인 경우 커스텀 스크립팅 탭으로 안내합니다.
         /// </summary>
         private async void EditMacroButton_Click(object sender, RoutedEventArgs e)
         {
@@ -348,6 +379,17 @@ namespace VoiceMacroPro
                 if (MacroDataGrid?.SelectedItem is not Macro selectedMacro)
                 {
                     MessageBox.Show("수정할 매크로를 선택해주세요.", "알림", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 커스텀 스크립트인 경우 안내 메시지 표시
+                if (selectedMacro.IsScript)
+                {
+                    MessageBox.Show($"'{selectedMacro.Name}'은(는) 커스텀 스크립트입니다.\n\n" +
+                                  "커스텀 스크립트는 '커스텀 스크립팅' 탭에서 수정하실 수 있습니다.", 
+                                  "커스텀 스크립트 안내", 
+                                  MessageBoxButton.OK, 
+                                  MessageBoxImage.Information);
                     return;
                 }
 
