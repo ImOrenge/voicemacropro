@@ -6,18 +6,23 @@ from voice_recognition_service import get_voice_recognition_service
 from whisper_service import whisper_service
 from macro_execution_service import macro_execution_service
 from preset_service import preset_service
+from custom_script_service import custom_script_service
 import json
 import numpy as np
 import base64
 import asyncio
 import threading
 import os
+import sqlite3
 from werkzeug.utils import secure_filename
 from database import DatabaseManager
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__)
 CORS(app)  # CORS 설정 (프론트엔드와의 통신을 위해)
+
+# 데이터베이스 설정
+db_path = "voice_macro.db"
 
 @app.route('/api/macros', methods=['GET'])
 def get_macros():
@@ -1408,6 +1413,439 @@ def get_preset_statistics():
             'success': False,
             'error': str(e),
             'message': '프리셋 통계 조회 실패'
+        }), 500
+
+# =============================================================================
+# 커스텀 스크립팅 API 엔드포인트 (MSL - Macro Scripting Language)
+# =============================================================================
+
+@app.route('/api/scripts/validate', methods=['POST'])
+def validate_script():
+    """
+    MSL 스크립트 코드를 검증하는 API 엔드포인트
+    
+    요청 본문:
+        script_code (str): 검증할 MSL 스크립트 코드
+        
+    Returns:
+        JSON: 검증 결과
+    """
+    try:
+        data = request.get_json()
+        
+        if not data.get('script_code'):
+            return jsonify({
+                'success': False,
+                'message': '스크립트 코드가 필요합니다'
+            }), 400
+        
+        validation_result = custom_script_service.validate_script(data['script_code'])
+        
+        return jsonify({
+            'success': True,
+            'data': validation_result,
+            'message': '스크립트 검증 완료'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '스크립트 검증 실패'
+        }), 500
+
+@app.route('/api/scripts', methods=['GET'])
+def get_custom_scripts():
+    """
+    커스텀 스크립트 목록을 조회하는 API 엔드포인트
+    
+    쿼리 파라미터:
+        category (str): 카테고리 필터 (선택사항)
+        game_title (str): 게임 타이틀 필터 (선택사항)
+        search (str): 검색어 (선택사항)
+        
+    Returns:
+        JSON: 스크립트 목록
+    """
+    try:
+        # 쿼리 파라미터 추출
+        category = request.args.get('category')
+        game_title = request.args.get('game_title')
+        search = request.args.get('search')
+        
+        # 데이터베이스에서 스크립트 목록 조회
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # 기본 쿼리
+        base_query = """
+        SELECT cs.id, m.name as macro_name, cs.script_code, m.voice_command,
+               cs.created_at, cs.updated_at, cs.is_validated, spa.success_rate,
+               spa.average_execution_time, m.action_type, 
+               COALESCE(st.category, '기타') as category,
+               COALESCE(st.game_title, '공통') as game_title,
+               COALESCE(st.description, '') as description
+        FROM custom_scripts cs
+        JOIN macros m ON cs.macro_id = m.id
+        LEFT JOIN script_templates st ON cs.id = st.id
+        LEFT JOIN script_performance_analysis spa ON cs.id = spa.script_id
+        WHERE 1=1
+        """
+        
+        params = []
+        
+        # 필터 조건 추가
+        if category and category != '':
+            base_query += " AND COALESCE(st.category, '기타') = ?"
+            params.append(category)
+        
+        if game_title and game_title != '':
+            base_query += " AND COALESCE(st.game_title, '공통') = ?"
+            params.append(game_title)
+        
+        if search and search.strip():
+            base_query += " AND (m.name LIKE ? OR cs.script_code LIKE ? OR st.description LIKE ?)"
+            search_term = f"%{search.strip()}%"
+            params.extend([search_term, search_term, search_term])
+        
+        # 정렬 추가
+        base_query += " ORDER BY cs.updated_at DESC"
+        
+        cursor.execute(base_query, params)
+        scripts = cursor.fetchall()
+        
+        # 결과 포맷팅
+        script_list = []
+        for script in scripts:
+            script_data = {
+                'id': script[0],
+                'name': script[1],
+                'script_code': script[2],
+                'voice_command': script[3],
+                'created_at': script[4],
+                'updated_at': script[5],
+                'is_validated': bool(script[6]),
+                'success_rate': script[7] if script[7] is not None else 100.0,
+                'average_execution_time': script[8] if script[8] is not None else 0.0,
+                'action_type': script[9],
+                'category': script[10],
+                'game_title': script[11],
+                'description': script[12],
+                'status_text': '검증됨' if script[6] else '미검증',
+                'status_color': '#28A745' if script[6] else '#DC3545',
+                'success_rate_text': f"{script[7]:.1f}%" if script[7] is not None else "N/A",
+                'success_rate_color': '#28A745' if (script[7] or 100) >= 90 else '#FFC107' if (script[7] or 100) >= 70 else '#DC3545'
+            }
+            script_list.append(script_data)
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': script_list,
+            'count': len(script_list),
+            'message': '커스텀 스크립트 목록 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '스크립트 목록 조회 실패'
+        }), 500
+
+@app.route('/api/scripts', methods=['POST'])
+def create_custom_script():
+    """
+    새로운 커스텀 스크립트를 생성하는 API 엔드포인트
+    
+    요청 본문:
+        macro_id (int): 연결될 매크로 ID
+        script_code (str): MSL 스크립트 코드
+        variables (dict): 스크립트 변수 (선택사항)
+        
+    Returns:
+        JSON: 생성된 스크립트 ID
+    """
+    try:
+        data = request.get_json()
+        
+        # 필수 필드 검증
+        if not data.get('macro_id'):
+            return jsonify({
+                'success': False,
+                'message': '매크로 ID가 필요합니다'
+            }), 400
+        
+        if not data.get('script_code'):
+            return jsonify({
+                'success': False,
+                'message': '스크립트 코드가 필요합니다'
+            }), 400
+        
+        # 스크립트 생성
+        result = custom_script_service.create_custom_script(
+            macro_id=data['macro_id'],
+            script_code=data['script_code'],
+            variables=data.get('variables')
+        )
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'script_id': result['script_id'],
+                    'validation_result': result['validation_result']
+                },
+                'message': '커스텀 스크립트가 성공적으로 생성되었습니다'
+            }), 201
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error'],
+                'message': '커스텀 스크립트 생성 실패'
+            }), 400
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '커스텀 스크립트 생성 중 오류 발생'
+        }), 500
+
+@app.route('/api/scripts/<int:script_id>/execute', methods=['POST'])
+def execute_custom_script(script_id):
+    """
+    커스텀 스크립트를 실행하는 API 엔드포인트
+    
+    Args:
+        script_id (int): 실행할 스크립트 ID
+        
+    요청 본문:
+        context (dict): 실행 컨텍스트 (선택사항)
+        
+    Returns:
+        JSON: 실행 결과
+    """
+    try:
+        data = request.get_json()
+        context = data.get('context') if data else None
+        
+        # 비동기 실행을 위한 스레드 처리
+        def run_async_script():
+            return custom_script_service.execute_script(script_id, context)
+        
+        # 스크립트 실행
+        result = run_async_script()
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'result': result['result'],
+                    'execution_time_ms': result['execution_time_ms'],
+                    'log_id': result['log_id']
+                },
+                'message': '스크립트가 성공적으로 실행되었습니다'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error'],
+                'execution_time_ms': result.get('execution_time_ms', 0),
+                'message': '스크립트 실행 실패'
+            }), 400
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '스크립트 실행 중 오류 발생'
+        }), 500
+
+@app.route('/api/scripts/<int:script_id>/performance', methods=['GET'])
+def get_script_performance(script_id):
+    """
+    스크립트 성능 통계를 조회하는 API 엔드포인트
+    
+    Args:
+        script_id (int): 조회할 스크립트 ID
+        
+    Returns:
+        JSON: 성능 통계
+    """
+    try:
+        performance_stats = custom_script_service.get_script_performance_stats(script_id)
+        
+        return jsonify({
+            'success': True,
+            'data': performance_stats,
+            'message': '스크립트 성능 통계 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '성능 통계 조회 실패'
+        }), 500
+
+@app.route('/api/scripts/templates', methods=['GET'])
+def get_script_templates():
+    """
+    스크립트 템플릿 목록을 조회하는 API 엔드포인트
+    
+    쿼리 파라미터:
+        category (str): 카테고리 필터 (선택사항)
+        game_title (str): 게임 타이틀 필터 (선택사항)
+        
+    Returns:
+        JSON: 템플릿 목록
+    """
+    try:
+        category = request.args.get('category')
+        game_title = request.args.get('game_title')
+        
+        templates = custom_script_service.get_script_templates(category, game_title)
+        
+        return jsonify({
+            'success': True,
+            'data': templates,
+            'message': '스크립트 템플릿 목록 조회 성공'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '템플릿 목록 조회 실패'
+        }), 500
+
+@app.route('/api/scripts/templates', methods=['POST'])
+def create_script_template():
+    """
+    새로운 스크립트 템플릿을 생성하는 API 엔드포인트
+    
+    요청 본문:
+        name (str): 템플릿 이름
+        description (str): 템플릿 설명
+        category (str): 카테고리
+        template_code (str): 템플릿 코드
+        game_title (str): 게임 타이틀 (선택사항)
+        parameters (dict): 매개변수 정의 (선택사항)
+        difficulty_level (int): 난이도 레벨 (선택사항)
+        author_name (str): 작성자 (선택사항)
+        is_official (bool): 공식 템플릿 여부 (선택사항)
+        
+    Returns:
+        JSON: 생성된 템플릿 ID
+    """
+    try:
+        data = request.get_json()
+        
+        # 필수 필드 검증
+        required_fields = ['name', 'description', 'category', 'template_code']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({
+                    'success': False,
+                    'message': f'필수 필드가 누락되었습니다: {field}'
+                }), 400
+        
+        # 템플릿 생성
+        result = custom_script_service.create_script_template(
+            name=data['name'],
+            description=data['description'],
+            category=data['category'],
+            template_code=data['template_code'],
+            game_title=data.get('game_title'),
+            parameters=data.get('parameters', {}),
+            difficulty_level=data.get('difficulty_level', 1),
+            author_name=data.get('author_name'),
+            is_official=data.get('is_official', False)
+        )
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'data': {'template_id': result['template_id']},
+                'message': '스크립트 템플릿이 성공적으로 생성되었습니다'
+            }), 201
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error'],
+                'message': '템플릿 생성 실패'
+            }), 400
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '템플릿 생성 중 오류 발생'
+        }), 500
+
+@app.route('/api/scripts/test', methods=['POST'])
+def test_script_syntax():
+    """
+    MSL 스크립트 문법을 테스트하는 API 엔드포인트
+    (실제 실행 없이 구문 분석만 수행)
+    
+    요청 본문:
+        script_code (str): 테스트할 스크립트 코드
+        
+    Returns:
+        JSON: 구문 분석 결과
+    """
+    try:
+        data = request.get_json()
+        
+        if not data.get('script_code'):
+            return jsonify({
+                'success': False,
+                'message': '스크립트 코드가 필요합니다'
+            }), 400
+        
+        # 기본 문법 검증
+        validation_result = custom_script_service.validate_script(data['script_code'])
+        
+        if validation_result['valid']:
+            # 추가 분석 정보 제공
+            from msl_lexer import MSLLexer
+            from msl_parser import MSLParser
+            
+            lexer = MSLLexer()
+            parser = MSLParser()
+            
+            tokens = lexer.tokenize(data['script_code'])
+            ast = parser.parse(tokens)
+            
+            # AST 정보 수집
+            analysis_result = {
+                'valid': True,
+                'tokens': [{'type': token.type.name, 'value': token.value} for token in tokens[:10]],  # 처음 10개만
+                'ast_summary': str(ast)[:200] + '...' if len(str(ast)) > 200 else str(ast),
+                'complexity_score': validation_result.get('ast_nodes', 1),
+                'estimated_execution_time': validation_result.get('estimated_execution_time', 0)
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': analysis_result,
+                'message': '스크립트 문법 테스트 성공'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'data': validation_result,
+                'message': '스크립트 문법 오류 발견'
+            }), 400
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': '스크립트 테스트 중 오류 발생'
         }), 500
 
 @app.route('/api/health', methods=['GET'])

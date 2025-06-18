@@ -218,6 +218,462 @@
                 </Grid>
             </TabItem>
             
+            <!-- 커스텀 스크립팅 탭 -->
+            <TabItem Header="🔧 커스텀 스크립팅" FontSize="14" Padding="15,10">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- 상단 제어 패널 -->
+                    <Border Grid.Row="0" Background="White" Padding="15" Margin="0,0,0,10" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- 검색 및 필터 -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBox Name="ScriptSearchTextBox" 
+                                        Width="200" 
+                                        Height="30" 
+                                        VerticalContentAlignment="Center"
+                                        FontSize="14"/>
+                                <ComboBox Name="ScriptCategoryComboBox" 
+                                         Width="120" 
+                                         Height="30"
+                                         Margin="10,0,0,0">
+                                    <ComboBoxItem Content="모든 카테고리" Tag=""/>
+                                    <ComboBoxItem Content="전투" Tag="전투"/>
+                                    <ComboBoxItem Content="이동" Tag="이동"/>
+                                    <ComboBoxItem Content="상호작용" Tag="상호작용"/>
+                                    <ComboBoxItem Content="UI 조작" Tag="UI 조작"/>
+                                    <ComboBoxItem Content="기타" Tag="기타"/>
+                                </ComboBox>
+                                <ComboBox Name="ScriptGameComboBox" 
+                                         Width="120" 
+                                         Height="30"
+                                         Margin="10,0,0,0">
+                                    <ComboBoxItem Content="모든 게임" Tag=""/>
+                                    <ComboBoxItem Content="LOL" Tag="LOL"/>
+                                    <ComboBoxItem Content="PUBG" Tag="PUBG"/>
+                                    <ComboBoxItem Content="VALORANT" Tag="VALORANT"/>
+                                    <ComboBoxItem Content="공통" Tag="공통"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <!-- 정렬 옵션 -->
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0">
+                                <TextBlock Text="정렬:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <ComboBox Name="ScriptSortComboBox" 
+                                         Width="120" 
+                                         Height="30"
+                                         SelectedIndex="0">
+                                    <ComboBoxItem Content="이름순" Tag="name"/>
+                                    <ComboBoxItem Content="생성일순" Tag="created_at"/>
+                                    <ComboBoxItem Content="사용빈도순" Tag="usage_count"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <!-- 액션 버튼들 -->
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="20,0,0,0">
+                                <Button Name="RefreshScriptsButton"
+                                       Content="🔄 새로고침" 
+                                       Margin="0,0,10,0" 
+                                       Padding="10,5" 
+                                       Background="#27AE60" 
+                                       Foreground="White" 
+                                       BorderThickness="0"
+                                       Click="RefreshScriptsButton_Click"/>
+                                <Button Name="NewScriptButton"
+                                       Content="➕ 새 스크립트" 
+                                       Padding="15,5" 
+                                       Background="#2ECC71" 
+                                       Foreground="White" 
+                                       BorderThickness="0"
+                                       FontWeight="Bold"
+                                       Click="NewScriptButton_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- 메인 콘텐츠 영역 (좌우 분할) -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="350"/>
+                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <!-- 좌측: 스크립트 목록 -->
+                        <Border Grid.Column="0" Background="White" CornerRadius="5" Padding="10">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- 스크립트 목록 헤더 -->
+                                <TextBlock Grid.Row="0" 
+                                          Text="📜 스크립트 목록" 
+                                          FontWeight="Bold" 
+                                          FontSize="16" 
+                                          Margin="0,0,0,10"/>
+                                
+                                <!-- 스크립트 목록 DataGrid -->
+                                <DataGrid Grid.Row="1" 
+                                         Name="CustomScriptDataGrid" 
+                                         AutoGenerateColumns="False"
+                                         CanUserAddRows="False"
+                                         CanUserDeleteRows="False"
+                                         SelectionMode="Single"
+                                         GridLinesVisibility="Horizontal"
+                                         HeadersVisibility="Column"
+                                         AlternatingRowBackground="#F8F9FA"
+                                         RowBackground="White"
+                                         BorderThickness="0"
+                                         FontSize="11"
+                                         SelectionChanged="CustomScriptDataGrid_SelectionChanged">
+                                    
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="이름" 
+                                                           Binding="{Binding Name}" 
+                                                           Width="140" 
+                                                           IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="카테고리" 
+                                                           Binding="{Binding Category}" 
+                                                           Width="80" 
+                                                           IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="상태" 
+                                                           Binding="{Binding StatusText}" 
+                                                           Width="60" 
+                                                           IsReadOnly="True">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{Binding StatusColor}"/>
+                                                    <Setter Property="FontWeight" Value="Bold"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="성공률" 
+                                                           Binding="{Binding SuccessRateText}" 
+                                                           Width="70" 
+                                                           IsReadOnly="True">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{Binding SuccessRateColor}"/>
+                                                    <Setter Property="FontWeight" Value="Bold"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                    </DataGrid.Columns>
+                                    
+                                    <DataGrid.RowStyle>
+                                        <Style TargetType="DataGridRow">
+                                            <Setter Property="Height" Value="30"/>
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="#E8F6F3"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter Property="Background" Value="#3498DB"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGrid.RowStyle>
+                                    
+                                    <DataGrid.ColumnHeaderStyle>
+                                        <Style TargetType="DataGridColumnHeader">
+                                            <Setter Property="Background" Value="#34495E"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter Property="FontWeight" Value="Bold"/>
+                                            <Setter Property="FontSize" Value="11"/>
+                                            <Setter Property="Padding" Value="8,6"/>
+                                        </Style>
+                                    </DataGrid.ColumnHeaderStyle>
+                                </DataGrid>
+                                
+                                <!-- 스크립트 관리 버튼들 -->
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
+                                    <Button Name="EditScriptButton" 
+                                           Content="✏️ 수정" 
+                                           Margin="0,0,5,0" 
+                                           Padding="10,5" 
+                                           Background="#F39C12" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           IsEnabled="False"
+                                           Click="EditScriptButton_Click"/>
+                                    <Button Name="CopyScriptButton" 
+                                           Content="📋 복사" 
+                                           Margin="0,0,5,0" 
+                                           Padding="10,5" 
+                                           Background="#3498DB" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           IsEnabled="False"
+                                           Click="CopyScriptButton_Click"/>
+                                    <Button Name="DeleteScriptButton" 
+                                           Content="🗑️ 삭제" 
+                                           Margin="0,0,5,0" 
+                                           Padding="10,5" 
+                                           Background="#E74C3C" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           IsEnabled="False"
+                                           Click="DeleteScriptButton_Click"/>
+                                    <Button Name="ExecuteScriptButton" 
+                                           Content="▶️ 실행" 
+                                           Padding="10,5" 
+                                           Background="#28A745" 
+                                           Foreground="White" 
+                                           BorderThickness="0"
+                                           IsEnabled="False"
+                                           Click="ExecuteScriptButton_Click"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        
+                        <!-- 중앙: 구분선 -->
+                        <GridSplitter Grid.Column="1" 
+                                     HorizontalAlignment="Stretch" 
+                                     VerticalAlignment="Stretch"
+                                     Background="#BDC3C7"
+                                     ShowsPreview="True"/>
+                        
+                        <!-- 우측: 스크립트 에디터 -->
+                        <Border Grid.Column="2" Background="White" CornerRadius="5" Padding="15">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="120"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!-- 에디터 헤더 -->
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <TextBlock Grid.Column="0" 
+                                              Name="ScriptEditorTitle"
+                                              Text="🔧 MSL 스크립트 에디터" 
+                                              FontWeight="Bold" 
+                                              FontSize="16" 
+                                              Margin="0,0,0,15"/>
+                                              
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                        <Button Name="ValidateScriptButton"
+                                               Content="✅ 검증" 
+                                               Margin="0,0,10,0" 
+                                               Padding="10,5" 
+                                               Background="#17A2B8" 
+                                               Foreground="White" 
+                                               BorderThickness="0"
+                                               Click="ValidateScriptButton_Click"/>
+                                        <Button Name="SaveScriptButton"
+                                               Content="💾 저장" 
+                                               Padding="15,5" 
+                                               Background="#28A745" 
+                                               Foreground="White" 
+                                               BorderThickness="0"
+                                               FontWeight="Bold"
+                                               Click="SaveScriptButton_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <!-- 스크립트 정보 입력 -->
+                                <Grid Grid.Row="1" Margin="0,0,0,15">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="150"/>
+                                        <ColumnDefinition Width="150"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <!-- 스크립트 이름 -->
+                                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
+                                        <TextBlock Text="스크립트 이름:" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <TextBox Name="ScriptNameTextBox" 
+                                                Height="30" 
+                                                VerticalContentAlignment="Center"
+                                                FontSize="14"/>
+                                    </StackPanel>
+                                    
+                                    <!-- 카테고리 -->
+                                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,10,10">
+                                        <TextBlock Text="카테고리:" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <ComboBox Name="ScriptCategoryEditComboBox" 
+                                                 Height="30"
+                                                 IsEditable="True">
+                                            <ComboBoxItem Content="전투"/>
+                                            <ComboBoxItem Content="이동"/>
+                                            <ComboBoxItem Content="상호작용"/>
+                                            <ComboBoxItem Content="UI 조작"/>
+                                            <ComboBoxItem Content="기타"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    
+                                    <!-- 게임 -->
+                                    <StackPanel Grid.Row="0" Grid.Column="2">
+                                        <TextBlock Text="대상 게임:" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <ComboBox Name="ScriptGameEditComboBox" 
+                                                 Height="30"
+                                                 IsEditable="True">
+                                            <ComboBoxItem Content="LOL"/>
+                                            <ComboBoxItem Content="PUBG"/>
+                                            <ComboBoxItem Content="VALORANT"/>
+                                            <ComboBoxItem Content="공통"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    
+                                    <!-- 설명 -->
+                                    <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,0">
+                                        <TextBlock Text="설명:" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <TextBox Name="ScriptDescriptionTextBox" 
+                                                Height="30" 
+                                                VerticalContentAlignment="Center"
+                                                FontSize="14"/>
+                                    </StackPanel>
+                                </Grid>
+                                
+                                <!-- MSL 코드 에디터 -->
+                                <Grid Grid.Row="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    
+                                    <TextBlock Grid.Row="0" 
+                                              Text="MSL 코드:" 
+                                              FontWeight="Bold" 
+                                              Margin="0,0,0,5"/>
+                                    
+                                    <Border Grid.Row="1" 
+                                           BorderBrush="#BDC3C7" 
+                                           BorderThickness="1" 
+                                           CornerRadius="3">
+                                        <TextBox Name="ScriptCodeTextBox" 
+                                                AcceptsReturn="True" 
+                                                AcceptsTab="True"
+                                                TextWrapping="NoWrap"
+                                                VerticalScrollBarVisibility="Auto"
+                                                HorizontalScrollBarVisibility="Auto"
+                                                FontFamily="Consolas"
+                                                FontSize="12"
+                                                Background="#FAFAFA"
+                                                Padding="10"
+                                                Text="// MSL 스크립트를 여기에 작성하세요&#x0A;// 예시:&#x0A;action &quot;기본 공격&quot; {&#x0A;    press Q&#x0A;    wait 100ms&#x0A;    press W&#x0A;}"
+                                                TextChanged="ScriptCodeTextBox_TextChanged"/>
+                                    </Border>
+                                </Grid>
+                                
+                                <!-- 구분선 -->
+                                <Separator Grid.Row="3" Margin="0,15"/>
+                                
+                                <!-- 하단: 검증 결과 및 로그 -->
+                                <Grid Grid.Row="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="5"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- 검증 결과 -->
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="✅ 검증 결과:" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <Border Background="#F8F9FA" 
+                                               BorderBrush="#DEE2E6" 
+                                               BorderThickness="1" 
+                                               CornerRadius="3" 
+                                               Height="85">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <TextBlock Name="ValidationResultTextBlock" 
+                                                          Text="스크립트를 작성하고 검증 버튼을 클릭하세요." 
+                                                          TextWrapping="Wrap" 
+                                                          Margin="8"
+                                                          FontSize="11"
+                                                          Foreground="#6C757D"/>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+                                    
+                                    <GridSplitter Grid.Column="1" 
+                                                 HorizontalAlignment="Stretch" 
+                                                 VerticalAlignment="Stretch"
+                                                 Background="#E0E0E0"/>
+                                    
+                                    <!-- 실행 로그 -->
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="📋 실행 로그:" FontWeight="Bold" Margin="0,0,0,5"/>
+                                        <Border Background="#F8F9FA" 
+                                               BorderBrush="#DEE2E6" 
+                                               BorderThickness="1" 
+                                               CornerRadius="3" 
+                                               Height="85">
+                                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                <TextBlock Name="ExecutionLogTextBlock" 
+                                                          Text="스크립트 실행 로그가 여기에 표시됩니다." 
+                                                          TextWrapping="Wrap" 
+                                                          Margin="8"
+                                                          FontSize="11"
+                                                          Foreground="#6C757D"/>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    
+                    <!-- 하단 상태 바 -->
+                    <Border Grid.Row="2" Background="#2C3E50" Padding="15,8" Margin="0,10,0,0" CornerRadius="5">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock Grid.Column="0" 
+                                      Name="ScriptStatusTextBlock"
+                                      Text="준비됨" 
+                                      Foreground="White" 
+                                      VerticalAlignment="Center"/>
+                            
+                            <TextBlock Grid.Column="1" 
+                                      Name="ScriptCountTextBlock"
+                                      Text="스크립트: 0개" 
+                                      Foreground="#BDC3C7" 
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,20,0"/>
+                            
+                            <Button Grid.Column="2" 
+                                   Name="ScriptTemplatesButton"
+                                   Content="📋 템플릿 보기" 
+                                   Padding="15,5" 
+                                   Background="#9B59B6" 
+                                   Foreground="White" 
+                                   BorderThickness="0"
+                                   Click="ScriptTemplatesButton_Click"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+            
             <!-- PRD 3.2.3 음성 인식 시스템 -->
             <TabItem Header="🎤 음성 인식" FontSize="14" Padding="15,10">
                 <Grid Margin="10">

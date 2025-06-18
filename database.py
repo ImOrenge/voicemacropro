@@ -10,8 +10,8 @@ class DatabaseManager:
     스키마 버전 관리와 데이터 무결성을 보장합니다.
     """
     
-    # 스키마 버전 관리 (향후 데이터베이스 구조 변경 시 버전 업그레이드 용도)
-    SCHEMA_VERSION = 1
+    # 스키마 버전 관리 (커스텀 스크립팅 지원으로 버전 2 업그레이드)
+    SCHEMA_VERSION = 2
     
     def __init__(self, db_path: str = "voice_macro.db"):
         """
@@ -65,9 +65,9 @@ class DatabaseManager:
             # 초기 스키마 생성
             self._create_initial_schema(cursor)
         
-        # 향후 버전 업그레이드 로직 추가
-        # if from_version == 1:
-        #     self._migrate_v1_to_v2(cursor)
+        # 버전 1에서 2로 업그레이드: 커스텀 스크립팅 기능 추가
+        if from_version == 1:
+            self._migrate_v1_to_v2(cursor)
     
     def _create_initial_schema(self, cursor):
         """
@@ -84,7 +84,7 @@ class DatabaseManager:
         )
         ''')
         
-        # 매크로 테이블 생성 (개선된 스키마)
+        # 매크로 테이블 생성 (커스텀 스크립팅 지원으로 확장)
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS macros (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,11 +93,114 @@ class DatabaseManager:
             action_type TEXT NOT NULL,
             key_sequence TEXT NOT NULL,
             settings TEXT,
+            script_language TEXT DEFAULT 'MSL',
+            is_script BOOLEAN DEFAULT FALSE,
+            script_version TEXT DEFAULT '1.0',
             is_active BOOLEAN DEFAULT TRUE,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             usage_count INTEGER DEFAULT 0,
+            execution_time_avg REAL DEFAULT 0,
+            success_rate REAL DEFAULT 100,
             version INTEGER DEFAULT 1
+        )
+        ''')
+        
+        # 커스텀 스크립트 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS custom_scripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            macro_id INTEGER NOT NULL,
+            script_code TEXT NOT NULL,
+            compiled_code BLOB,
+            ast_tree TEXT,
+            dependencies TEXT,
+            variables TEXT,
+            performance_data TEXT,
+            security_hash TEXT,
+            is_validated BOOLEAN DEFAULT FALSE,
+            validation_date DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (macro_id) REFERENCES macros (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # 스크립트 템플릿 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            category TEXT NOT NULL,
+            game_title TEXT,
+            template_code TEXT NOT NULL,
+            parameters TEXT,
+            preview_gif BLOB,
+            difficulty_level INTEGER DEFAULT 1,
+            popularity_score INTEGER DEFAULT 0,
+            author_name TEXT,
+            is_official BOOLEAN DEFAULT FALSE,
+            is_public BOOLEAN DEFAULT TRUE,
+            download_count INTEGER DEFAULT 0,
+            rating_average REAL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 스크립트 실행 로그 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_execution_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            macro_id INTEGER NOT NULL,
+            script_id INTEGER,
+            execution_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+            execution_end DATETIME,
+            execution_time_ms INTEGER,
+            success BOOLEAN DEFAULT FALSE,
+            error_message TEXT,
+            input_parameters TEXT,
+            output_result TEXT,
+            performance_metrics TEXT,
+            memory_usage_kb INTEGER,
+            cpu_usage_percent REAL,
+            FOREIGN KEY (macro_id) REFERENCES macros (id) ON DELETE CASCADE,
+            FOREIGN KEY (script_id) REFERENCES custom_scripts (id) ON DELETE SET NULL
+        )
+        ''')
+        
+        # 스크립트 변수 저장소 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_variables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            variable_name TEXT NOT NULL UNIQUE,
+            variable_value TEXT NOT NULL,
+            variable_type TEXT NOT NULL,
+            scope TEXT DEFAULT 'global',
+            description TEXT,
+            is_persistent BOOLEAN DEFAULT TRUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 스크립트 성능 분석 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_performance_analysis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            script_id INTEGER NOT NULL,
+            analysis_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            total_executions INTEGER DEFAULT 0,
+            average_execution_time REAL,
+            min_execution_time REAL,
+            max_execution_time REAL,
+            success_rate REAL,
+            memory_efficiency_score REAL,
+            cpu_efficiency_score REAL,
+            bottleneck_operations TEXT,
+            optimization_suggestions TEXT,
+            FOREIGN KEY (script_id) REFERENCES custom_scripts (id) ON DELETE CASCADE
         )
         ''')
         
@@ -132,6 +235,142 @@ class DatabaseManager:
         
         # 현재 스키마 버전 기록
         cursor.execute("INSERT INTO schema_version (version) VALUES (?)", (self.SCHEMA_VERSION,))
+
+    def _migrate_v1_to_v2(self, cursor):
+        """
+        버전 1에서 2로 마이그레이션: 커스텀 스크립팅 기능 추가
+        Args:
+            cursor: 데이터베이스 커서
+        """
+        # 매크로 테이블에 스크립팅 관련 컬럼 추가
+        try:
+            cursor.execute("ALTER TABLE macros ADD COLUMN script_language TEXT DEFAULT 'MSL'")
+        except sqlite3.OperationalError:
+            pass  # 컬럼이 이미 존재하면 무시
+        
+        try:
+            cursor.execute("ALTER TABLE macros ADD COLUMN is_script BOOLEAN DEFAULT FALSE")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE macros ADD COLUMN script_version TEXT DEFAULT '1.0'")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE macros ADD COLUMN execution_time_avg REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE macros ADD COLUMN success_rate REAL DEFAULT 100")
+        except sqlite3.OperationalError:
+            pass
+        
+        # 커스텀 스크립트 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS custom_scripts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            macro_id INTEGER NOT NULL,
+            script_code TEXT NOT NULL,
+            compiled_code BLOB,
+            ast_tree TEXT,
+            dependencies TEXT,
+            variables TEXT,
+            performance_data TEXT,
+            security_hash TEXT,
+            is_validated BOOLEAN DEFAULT FALSE,
+            validation_date DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (macro_id) REFERENCES macros (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # 스크립트 템플릿 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_templates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            category TEXT NOT NULL,
+            game_title TEXT,
+            template_code TEXT NOT NULL,
+            parameters TEXT,
+            preview_gif BLOB,
+            difficulty_level INTEGER DEFAULT 1,
+            popularity_score INTEGER DEFAULT 0,
+            author_name TEXT,
+            is_official BOOLEAN DEFAULT FALSE,
+            is_public BOOLEAN DEFAULT TRUE,
+            download_count INTEGER DEFAULT 0,
+            rating_average REAL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 스크립트 실행 로그 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_execution_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            macro_id INTEGER NOT NULL,
+            script_id INTEGER,
+            execution_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+            execution_end DATETIME,
+            execution_time_ms INTEGER,
+            success BOOLEAN DEFAULT FALSE,
+            error_message TEXT,
+            input_parameters TEXT,
+            output_result TEXT,
+            performance_metrics TEXT,
+            memory_usage_kb INTEGER,
+            cpu_usage_percent REAL,
+            FOREIGN KEY (macro_id) REFERENCES macros (id) ON DELETE CASCADE,
+            FOREIGN KEY (script_id) REFERENCES custom_scripts (id) ON DELETE SET NULL
+        )
+        ''')
+        
+        # 스크립트 변수 저장소 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_variables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            variable_name TEXT NOT NULL UNIQUE,
+            variable_value TEXT NOT NULL,
+            variable_type TEXT NOT NULL,
+            scope TEXT DEFAULT 'global',
+            description TEXT,
+            is_persistent BOOLEAN DEFAULT TRUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+        
+        # 스크립트 성능 분석 테이블 생성
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS script_performance_analysis (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            script_id INTEGER NOT NULL,
+            analysis_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            total_executions INTEGER DEFAULT 0,
+            average_execution_time REAL,
+            min_execution_time REAL,
+            max_execution_time REAL,
+            success_rate REAL,
+            memory_efficiency_score REAL,
+            cpu_efficiency_score REAL,
+            bottleneck_operations TEXT,
+            optimization_suggestions TEXT,
+            FOREIGN KEY (script_id) REFERENCES custom_scripts (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # 새로운 인덱스 추가
+        self._create_script_indexes(cursor)
+        
+        # 마이그레이션 완료 기록
+        cursor.execute("INSERT INTO schema_version (version) VALUES (?)", (2,))
     
     def _create_indexes(self, cursor):
         """
@@ -145,6 +384,8 @@ class DatabaseManager:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_macros_created_at ON macros(created_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_macros_usage_count ON macros(usage_count)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_macros_is_active ON macros(is_active)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_macros_action_type ON macros(action_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_macros_is_script ON macros(is_script)")
         
         # 프리셋 테이블 인덱스
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_presets_name ON presets(name)")
@@ -155,6 +396,40 @@ class DatabaseManager:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_logs_macro_id ON logs(macro_id)")
+        
+        # 스크립트 관련 인덱스
+        self._create_script_indexes(cursor)
+    
+    def _create_script_indexes(self, cursor):
+        """
+        스크립트 관련 테이블의 인덱스를 생성하는 함수
+        Args:
+            cursor: 데이터베이스 커서
+        """
+        # 커스텀 스크립트 테이블 인덱스
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_scripts_macro_id ON custom_scripts(macro_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_custom_scripts_is_validated ON custom_scripts(is_validated)")
+        
+        # 스크립트 템플릿 테이블 인덱스
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_templates_category ON script_templates(category)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_templates_game_title ON script_templates(game_title)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_templates_is_official ON script_templates(is_official)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_templates_is_public ON script_templates(is_public)")
+        
+        # 스크립트 실행 로그 테이블 인덱스
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_execution_logs_macro_id ON script_execution_logs(macro_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_execution_logs_script_id ON script_execution_logs(script_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_execution_logs_execution_start ON script_execution_logs(execution_start)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_execution_logs_success ON script_execution_logs(success)")
+        
+        # 스크립트 변수 테이블 인덱스
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_variables_variable_name ON script_variables(variable_name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_variables_scope ON script_variables(scope)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_variables_is_persistent ON script_variables(is_persistent)")
+        
+        # 스크립트 성능 분석 테이블 인덱스
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_performance_analysis_script_id ON script_performance_analysis(script_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_script_performance_analysis_analysis_date ON script_performance_analysis(analysis_date)")
     
     def get_connection(self):
         """

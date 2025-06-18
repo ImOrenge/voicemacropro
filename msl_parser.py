@@ -304,8 +304,8 @@ class MSLParser:
         # 마우스 좌표
         if self.match(TokenType.MOUSE_COORD):
             mouse_token = self.expect(TokenType.MOUSE_COORD)
-            # @(x,y) 형태에서 x, y 추출
-            match = re.match(r'@\(\s*(\d+)\s*,\s*(\d+)\s*\)', mouse_token.value)
+            # @(x,y) 형태에서 x, y 추출 (음수 지원)
+            match = re.match(r'@\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)', mouse_token.value)
             if match:
                 x, y = int(match.group(1)), int(match.group(2))
                 return MouseCoordNode(x, y, self._get_position(mouse_token))
@@ -362,19 +362,10 @@ class MSLParser:
                 
                 self.expect(TokenType.DELAY_END)  # ) 소비
                 
-                # DelayNode를 직접 base_node에 연결하지 않고, 별도로 처리
-                # 이후 상위 파싱에서 이 정보를 사용할 수 있도록 노드에 메타데이터 추가
+                # 지연 노드 생성
                 delay_node = DelayNode(delay, self._get_position())
-                
-                # 현재 노드에 지연 정보 첨부 (임시 솔루션)
-                if hasattr(current_node, '_delay_after'):
-                    current_node._delay_after = delay
-                else:
-                    # 새로운 시퀀스 노드로 감싸기
-                    seq_node = SequentialNode(self._get_position())
-                    seq_node.add_child(current_node)
-                    seq_node.add_child(delay_node)
-                    current_node = seq_node
+                delay_node.add_child(current_node)
+                current_node = delay_node
             
             # 홀드 시간 [숫자]
             elif self.match(TokenType.HOLD_START):

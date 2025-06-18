@@ -977,6 +977,410 @@ namespace VoiceMacroPro.Services
             _httpClient?.Dispose();
         }
 
+        // =====================================
+        // 커스텀 스크립트 관련 API 메서드들
+        // =====================================
+
+        /// <summary>
+        /// 모든 커스텀 스크립트를 조회하는 함수
+        /// 검색어, 카테고리, 게임 필터링 및 정렬 조건을 포함하여 서버에 요청합니다.
+        /// </summary>
+        /// <param name="searchTerm">검색어 (선택사항)</param>
+        /// <param name="category">카테고리 필터 (선택사항)</param>
+        /// <param name="gameTarget">게임 필터 (선택사항)</param>
+        /// <param name="sortBy">정렬 기준 (name, created_at, usage_count)</param>
+        /// <returns>커스텀 스크립트 목록</returns>
+        public async Task<List<CustomScript>> GetCustomScriptsAsync(string? searchTerm = null, 
+            string? category = null, string? gameTarget = null, string sortBy = "name")
+        {
+            try
+            {
+                // URL 쿼리 파라미터 구성
+                var queryParams = new List<string>();
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    queryParams.Add($"search={Uri.EscapeDataString(searchTerm)}");
+                }
+                if (!string.IsNullOrWhiteSpace(category))
+                {
+                    queryParams.Add($"category={Uri.EscapeDataString(category)}");
+                }
+                if (!string.IsNullOrWhiteSpace(gameTarget))
+                {
+                    queryParams.Add($"game={Uri.EscapeDataString(gameTarget)}");
+                }
+                queryParams.Add($"sort={sortBy}");
+
+                var queryString = string.Join("&", queryParams);
+                var url = $"{_baseUrl}/api/scripts?{queryString}";
+
+                // HTTP GET 요청 전송
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // JSON 응답을 파싱하여 스크립트 목록 반환
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<CustomScript>>>(content);
+                    return apiResponse?.Data ?? new List<CustomScript>();
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"커스텀 스크립트 목록 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 특정 ID의 커스텀 스크립트를 조회하는 함수
+        /// </summary>
+        /// <param name="scriptId">조회할 스크립트 ID</param>
+        /// <returns>커스텀 스크립트 객체 (없으면 null)</returns>
+        public async Task<CustomScript?> GetCustomScriptAsync(int scriptId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/{scriptId}";
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<CustomScript>>(content);
+                    return apiResponse?.Data;
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null; // 스크립트를 찾지 못함
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"커스텀 스크립트 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// MSL 스크립트 코드를 검증하는 함수
+        /// 실제 실행하지 않고 문법 검사만 수행합니다.
+        /// </summary>
+        /// <param name="scriptCode">검증할 MSL 스크립트 코드</param>
+        /// <returns>검증 결과</returns>
+        public async Task<ScriptValidationResult?> ValidateScriptAsync(string scriptCode)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/validate";
+                
+                var jsonContent = JsonConvert.SerializeObject(new
+                {
+                    script_code = scriptCode
+                });
+
+                var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, httpContent);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<ScriptValidationResult>>(content);
+                    return apiResponse?.Data;
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"스크립트 검증 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 새로운 커스텀 스크립트를 생성하는 함수
+        /// </summary>
+        /// <param name="script">생성할 커스텀 스크립트 객체</param>
+        /// <returns>생성된 스크립트의 ID</returns>
+        public async Task<int> CreateCustomScriptAsync(CustomScript script)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts";
+                
+                // 스크립트 객체를 JSON으로 변환
+                var jsonContent = JsonConvert.SerializeObject(new
+                {
+                    name = script.Name,
+                    description = script.Description,
+                    script_code = script.ScriptCode,
+                    category = script.Category,
+                    game_target = script.GameTarget,
+                    is_active = script.IsActive
+                });
+
+                var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, httpContent);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
+                    return (int)apiResponse?.Data?.id;
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"커스텀 스크립트 생성 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 기존 커스텀 스크립트를 수정하는 함수
+        /// </summary>
+        /// <param name="script">수정할 커스텀 스크립트 객체</param>
+        /// <returns>수정 성공 여부</returns>
+        public async Task<bool> UpdateCustomScriptAsync(CustomScript script)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/{script.Id}";
+                
+                var jsonContent = JsonConvert.SerializeObject(new
+                {
+                    name = script.Name,
+                    description = script.Description,
+                    script_code = script.ScriptCode,
+                    category = script.Category,
+                    game_target = script.GameTarget,
+                    is_active = script.IsActive
+                });
+
+                var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PutAsync(url, httpContent);
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"커스텀 스크립트 수정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 커스텀 스크립트를 삭제하는 함수
+        /// </summary>
+        /// <param name="scriptId">삭제할 스크립트 ID</param>
+        /// <returns>삭제 성공 여부</returns>
+        public async Task<bool> DeleteCustomScriptAsync(int scriptId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/{scriptId}";
+                var response = await _httpClient.DeleteAsync(url);
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"커스텀 스크립트 삭제 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 커스텀 스크립트를 실행하는 함수
+        /// </summary>
+        /// <param name="scriptId">실행할 스크립트 ID</param>
+        /// <returns>실행 성공 여부</returns>
+        public async Task<bool> ExecuteCustomScriptAsync(int scriptId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/{scriptId}/execute";
+                var response = await _httpClient.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"커스텀 스크립트 실행 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 커스텀 스크립트의 성능 통계를 조회하는 함수
+        /// </summary>
+        /// <param name="scriptId">조회할 스크립트 ID</param>
+        /// <returns>성능 통계 객체</returns>
+        public async Task<ScriptPerformanceStats?> GetScriptPerformanceAsync(int scriptId)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/{scriptId}/performance";
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<ScriptPerformanceStats>>(content);
+                    return apiResponse?.Data;
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null; // 성능 데이터를 찾지 못함
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"스크립트 성능 통계 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 템플릿 목록을 조회하는 함수
+        /// </summary>
+        /// <param name="category">카테고리 필터 (선택사항)</param>
+        /// <param name="gameTarget">게임 필터 (선택사항)</param>
+        /// <param name="difficultyLevel">난이도 필터 (선택사항)</param>
+        /// <returns>스크립트 템플릿 목록</returns>
+        public async Task<List<ScriptTemplate>> GetScriptTemplatesAsync(string? category = null, 
+            string? gameTarget = null, string? difficultyLevel = null)
+        {
+            try
+            {
+                // URL 쿼리 파라미터 구성
+                var queryParams = new List<string>();
+                if (!string.IsNullOrWhiteSpace(category))
+                {
+                    queryParams.Add($"category={Uri.EscapeDataString(category)}");
+                }
+                if (!string.IsNullOrWhiteSpace(gameTarget))
+                {
+                    queryParams.Add($"game={Uri.EscapeDataString(gameTarget)}");
+                }
+                if (!string.IsNullOrWhiteSpace(difficultyLevel))
+                {
+                    queryParams.Add($"difficulty={Uri.EscapeDataString(difficultyLevel)}");
+                }
+
+                var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
+                var url = $"{_baseUrl}/api/scripts/templates{queryString}";
+
+                // HTTP GET 요청 전송
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<ScriptTemplate>>>(content);
+                    return apiResponse?.Data ?? new List<ScriptTemplate>();
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"스크립트 템플릿 목록 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 새로운 스크립트 템플릿을 생성하는 함수
+        /// </summary>
+        /// <param name="template">생성할 스크립트 템플릿 객체</param>
+        /// <returns>생성된 템플릿의 ID</returns>
+        public async Task<int> CreateScriptTemplateAsync(ScriptTemplate template)
+        {
+            try
+            {
+                var url = $"{_baseUrl}/api/scripts/templates";
+                
+                var jsonContent = JsonConvert.SerializeObject(new
+                {
+                    name = template.Name,
+                    description = template.Description,
+                    category = template.Category,
+                    game_target = template.GameTarget,
+                    template_code = template.TemplateCode,
+                    difficulty_level = template.DifficultyLevel
+                });
+
+                var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await _httpClient.PostAsync(url, httpContent);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
+                    return (int)apiResponse?.Data?.id;
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"스크립트 템플릿 생성 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 실행 로그를 조회하는 함수
+        /// </summary>
+        /// <param name="scriptId">조회할 스크립트 ID (선택사항)</param>
+        /// <param name="limit">조회할 로그 개수 (기본값: 50)</param>
+        /// <returns>스크립트 실행 로그 목록</returns>
+        public async Task<List<ScriptExecutionLog>> GetScriptExecutionLogsAsync(int? scriptId = null, int limit = 50)
+        {
+            try
+            {
+                var queryParams = new List<string> { $"limit={limit}" };
+                if (scriptId.HasValue)
+                {
+                    queryParams.Add($"script_id={scriptId.Value}");
+                }
+
+                var queryString = "?" + string.Join("&", queryParams);
+                var url = $"{_baseUrl}/api/scripts/logs{queryString}";
+
+                var response = await _httpClient.GetAsync(url);
+                var content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<List<ScriptExecutionLog>>>(content);
+                    return apiResponse?.Data ?? new List<ScriptExecutionLog>();
+                }
+                else
+                {
+                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"스크립트 실행 로그 조회 중 오류 발생: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// 음성 명령을 분석하여 매칭되는 매크로들을 반환하는 메서드
         /// </summary>

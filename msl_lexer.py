@@ -88,8 +88,8 @@ class MSLLexer:
         # 변수 패턴 ($로 시작)
         self.variable_pattern = re.compile(r'\$[A-Za-z][A-Za-z0-9_]*')
         
-        # 마우스 좌표 패턴 @(x,y)
-        self.mouse_coord_pattern = re.compile(r'@\(\s*\d+\s*,\s*\d+\s*\)')
+        # 마우스 좌표 패턴 @(x,y) - 음수 지원
+        self.mouse_coord_pattern = re.compile(r'@\(\s*-?\d+\s*,\s*-?\d+\s*\)')
         
         # 휠 패턴 wheel+숫자 또는 wheel-숫자
         self.wheel_pattern = re.compile(r'wheel[+-]\d*')
@@ -99,6 +99,9 @@ class MSLLexer:
         
         # 공백 패턴
         self.whitespace_pattern = re.compile(r'\s+')
+        
+        # 음수 패턴 (-숫자)
+        self.negative_number_pattern = re.compile(r'-\d+\.?\d*')
         
         # 연산자 매핑
         self.operators = {
@@ -223,6 +226,23 @@ class MSLLexer:
                 
                 position += len(variable)
                 column += len(variable)
+                continue
+            
+            # 음수 처리 (-숫자) - 먼저 체크해야 함
+            if char == '-' and self.negative_number_pattern.match(text[position:]):
+                match = self.negative_number_pattern.match(text[position:])
+                number = match.group()
+                
+                tokens.append(Token(
+                    type=TokenType.NUMBER,
+                    value=number,
+                    position=position,
+                    line=line,
+                    column=column
+                ))
+                
+                position += len(number)
+                column += len(number)
                 continue
             
             # 숫자 처리

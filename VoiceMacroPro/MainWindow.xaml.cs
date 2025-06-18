@@ -43,6 +43,16 @@ namespace VoiceMacroPro
         private string _currentPresetSearchTerm = string.Empty;
         private bool _favoritesOnly = false;
 
+        // ==================== 커스텀 스크립팅 관련 필드 ====================
+        private List<CustomScript> _allCustomScripts = new List<CustomScript>();
+        private CustomScript? _selectedCustomScript = null;
+        private string _currentScriptSearchTerm = string.Empty;
+        private string _currentScriptCategory = string.Empty;
+        private string _currentScriptGame = string.Empty;
+        private string _currentScriptSortBy = "name";
+        private bool _isEditingScript = false;
+        private int _editingScriptId = 0;
+
         /// <summary>
         /// 메인 윈도우 생성자
         /// API 서비스를 초기화하고 UI를 설정합니다.
@@ -117,6 +127,10 @@ namespace VoiceMacroPro
                 // 프리셋 목록 로드
                 await LoadPresets();
                 System.Diagnostics.Debug.WriteLine("프리셋 로드 완료");
+                
+                // 커스텀 스크립트 목록 로드
+                await LoadCustomScripts();
+                System.Diagnostics.Debug.WriteLine("커스텀 스크립트 로드 완료");
                 
                 // 음성 인식 UI 초기화 (UI 요소들이 모두 로드된 후)
                 InitializeVoiceRecognitionUI();
@@ -206,6 +220,10 @@ namespace VoiceMacroPro
         {
             try
             {
+                // 서비스가 초기화되지 않은 경우 대기
+                if (_apiService == null)
+                    return;
+                
                 UpdateStatusText("매크로 목록 로딩 중...");
                 
                 // API를 통해 매크로 목록 조회
@@ -217,7 +235,7 @@ namespace VoiceMacroPro
                     MacroDataGrid.ItemsSource = _allMacros;
                 }
                 
-                _loggingService.LogInfo($"매크로 목록 로드 완료: {_allMacros.Count}개 항목");
+                _loggingService?.LogInfo($"매크로 목록 로드 완료: {_allMacros.Count}개 항목");
                 UpdateStatusText($"매크로 {_allMacros.Count}개 로드 완료");
             }
             catch (Exception ex)
@@ -225,6 +243,7 @@ namespace VoiceMacroPro
                 MessageBox.Show($"매크로 목록을 불러오는 중 오류가 발생했습니다:\n{ex.Message}", 
                               "오류", MessageBoxButton.OK, MessageBoxImage.Error);
                 UpdateStatusText("매크로 로드 실패");
+                _loggingService?.LogError($"매크로 로드 실패: {ex.Message}");
             }
         }
 
@@ -244,6 +263,10 @@ namespace VoiceMacroPro
         /// </summary>
         private async void SortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            // 초기화가 완료되지 않은 상태에서는 이벤트를 무시
+            if (_loggingService == null || _apiService == null)
+                return;
+                
             if (SortComboBox.SelectedItem is ComboBoxItem selectedItem)
             {
                 _currentSortBy = selectedItem.Tag?.ToString() ?? "name";
@@ -1160,8 +1183,6 @@ namespace VoiceMacroPro
             }
         }
 
-
-
         /// <summary>
         /// 프리셋 검색 텍스트박스 텍스트 변경 이벤트 핸들러
         /// </summary>
@@ -1473,6 +1494,854 @@ namespace VoiceMacroPro
         {
             if (_loggingService == null) return;
             _loggingService.LogDebug("홀드 고정 지속시간 체크 해제됨");
+        }
+
+        // ==================== 커스텀 스크립팅 탭 관련 메서드들 ====================
+
+        /// <summary>
+        /// 커스텀 스크립트 목록을 서버에서 불러와 DataGrid에 표시하는 함수
+        /// </summary>
+        private async Task LoadCustomScripts()
+        {
+            try
+            {
+                UpdateStatusText("커스텀 스크립트 목록 로딩 중...");
+
+                // API를 통해 커스텀 스크립트 목록 조회
+                _allCustomScripts = await _apiService.GetCustomScriptsAsync(
+                    _currentScriptSearchTerm, 
+                    _currentScriptCategory, 
+                    _currentScriptGame, 
+                    _currentScriptSortBy);
+
+                // DataGrid에 바인딩
+                if (CustomScriptDataGrid != null)
+                {
+                    CustomScriptDataGrid.ItemsSource = _allCustomScripts;
+                }
+
+                // 스크립트 개수 표시 업데이트
+                if (ScriptCountTextBlock != null)
+                {
+                    ScriptCountTextBlock.Text = $"스크립트: {_allCustomScripts.Count}개";
+                }
+
+                _loggingService.LogInfo($"커스텀 스크립트 목록 로드 완료: {_allCustomScripts.Count}개 항목");
+                UpdateStatusText($"커스텀 스크립트 {_allCustomScripts.Count}개 로드 완료");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"커스텀 스크립트 목록을 불러오는 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                UpdateStatusText("커스텀 스크립트 로드 실패");
+                _loggingService.LogError($"커스텀 스크립트 로드 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 커스텀 스크립트 검색/필터링 및 새로고침 버튼 클릭 이벤트
+        /// </summary>
+        private async void RefreshScriptsButton_Click(object sender, RoutedEventArgs e)
+        {
+            // 검색어 업데이트
+            _currentScriptSearchTerm = ScriptSearchTextBox?.Text?.Trim() ?? string.Empty;
+
+            // 카테고리 필터 업데이트
+            if (ScriptCategoryComboBox?.SelectedItem is ComboBoxItem categoryItem)
+            {
+                _currentScriptCategory = categoryItem.Tag?.ToString() ?? string.Empty;
+            }
+
+            // 게임 필터 업데이트
+            if (ScriptGameComboBox?.SelectedItem is ComboBoxItem gameItem)
+            {
+                _currentScriptGame = gameItem.Tag?.ToString() ?? string.Empty;
+            }
+
+            // 정렬 기준 업데이트
+            if (ScriptSortComboBox?.SelectedItem is ComboBoxItem sortItem)
+            {
+                _currentScriptSortBy = sortItem.Tag?.ToString() ?? "name";
+            }
+
+            await LoadCustomScripts();
+        }
+
+        /// <summary>
+        /// 새 스크립트 버튼 클릭 이벤트
+        /// 새 커스텀 스크립트 작성 모드로 전환
+        /// </summary>
+        private void NewScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 편집 모드 초기화
+                _isEditingScript = false;
+                _editingScriptId = 0;
+                _selectedCustomScript = null;
+
+                // 에디터 타이틀 변경
+                if (ScriptEditorTitle != null)
+                {
+                    ScriptEditorTitle.Text = "🔧 새 MSL 스크립트 작성";
+                }
+
+                // 입력 필드 초기화
+                ClearScriptEditor();
+
+                // 상태 업데이트
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = "새 스크립트 작성 모드";
+                }
+
+                _loggingService.LogInfo("새 커스텀 스크립트 작성 모드로 전환되었습니다.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"새 스크립트 모드 전환 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"새 스크립트 모드 전환 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 목록에서 선택이 변경될 때 실행되는 이벤트 핸들러
+        /// </summary>
+        private void CustomScriptDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                if (CustomScriptDataGrid.SelectedItem is CustomScript selectedScript)
+                {
+                    _selectedCustomScript = selectedScript;
+
+                    // 선택된 스크립트 정보를 에디터에 로드
+                    LoadScriptToEditor(selectedScript);
+
+                    // 버튼 활성화
+                    EnableScriptButtons(true);
+
+                    // 상태 업데이트
+                    if (ScriptStatusTextBlock != null)
+                    {
+                        ScriptStatusTextBlock.Text = $"선택됨: {selectedScript.Name}";
+                    }
+                }
+                else
+                {
+                    _selectedCustomScript = null;
+                    EnableScriptButtons(false);
+
+                    if (ScriptStatusTextBlock != null)
+                    {
+                        ScriptStatusTextBlock.Text = "준비됨";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"스크립트 선택 처리 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 선택된 스크립트를 에디터에 로드하는 함수
+        /// </summary>
+        private void LoadScriptToEditor(CustomScript script)
+        {
+            try
+            {
+                _isEditingScript = true;
+                _editingScriptId = script.Id;
+
+                // 에디터 타이틀 변경
+                if (ScriptEditorTitle != null)
+                {
+                    ScriptEditorTitle.Text = $"🔧 MSL 스크립트 에디터 - {script.Name}";
+                }
+
+                // 스크립트 정보 입력 필드 채우기
+                if (ScriptNameTextBox != null)
+                {
+                    ScriptNameTextBox.Text = script.Name;
+                }
+
+                if (ScriptDescriptionTextBox != null)
+                {
+                    ScriptDescriptionTextBox.Text = script.Description;
+                }
+
+                if (ScriptCategoryEditComboBox != null)
+                {
+                    ScriptCategoryEditComboBox.Text = script.Category;
+                }
+
+                if (ScriptGameEditComboBox != null)
+                {
+                    ScriptGameEditComboBox.Text = script.GameTarget;
+                }
+
+                if (ScriptCodeTextBox != null)
+                {
+                    ScriptCodeTextBox.Text = script.ScriptCode;
+                }
+
+                // 검증 결과 및 로그 초기화
+                if (ValidationResultTextBlock != null)
+                {
+                    ValidationResultTextBlock.Text = "스크립트가 로드되었습니다. 검증 버튼을 클릭하여 확인하세요.";
+                    ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Blue);
+                }
+
+                if (ExecutionLogTextBlock != null)
+                {
+                    ExecutionLogTextBlock.Text = "";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"스크립트를 에디터에 로드하는 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 에디터 로드 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 에디터 필드를 초기화하는 함수
+        /// </summary>
+        private void ClearScriptEditor()
+        {
+            try
+            {
+                if (ScriptNameTextBox != null)
+                {
+                    ScriptNameTextBox.Text = "";
+                }
+
+                if (ScriptDescriptionTextBox != null)
+                {
+                    ScriptDescriptionTextBox.Text = "";
+                }
+
+                if (ScriptCategoryEditComboBox != null)
+                {
+                    ScriptCategoryEditComboBox.SelectedIndex = 0;
+                }
+
+                if (ScriptGameEditComboBox != null)
+                {
+                    ScriptGameEditComboBox.SelectedIndex = 0;
+                }
+
+                if (ScriptCodeTextBox != null)
+                {
+                    ScriptCodeTextBox.Text = @"// MSL 스크립트를 여기에 작성하세요
+// 예시:
+action ""기본 공격"" {
+    press Q
+    wait 100ms
+    press W
+}";
+                }
+
+                if (ValidationResultTextBlock != null)
+                {
+                    ValidationResultTextBlock.Text = "스크립트를 작성하고 검증 버튼을 클릭하세요.";
+                    ValidationResultTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(108, 117, 125));
+                }
+
+                if (ExecutionLogTextBlock != null)
+                {
+                    ExecutionLogTextBlock.Text = "스크립트 실행 로그가 여기에 표시됩니다.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"스크립트 에디터 초기화 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 관련 버튼들의 활성화 상태를 설정하는 함수
+        /// </summary>
+        private void EnableScriptButtons(bool enabled)
+        {
+            try
+            {
+                if (EditScriptButton != null)
+                {
+                    EditScriptButton.IsEnabled = enabled;
+                }
+
+                if (CopyScriptButton != null)
+                {
+                    CopyScriptButton.IsEnabled = enabled;
+                }
+
+                if (DeleteScriptButton != null)
+                {
+                    DeleteScriptButton.IsEnabled = enabled;
+                }
+
+                if (ExecuteScriptButton != null)
+                {
+                    ExecuteScriptButton.IsEnabled = enabled;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"스크립트 버튼 상태 설정 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 검증 버튼 클릭 이벤트
+        /// MSL 스크립트 코드를 서버에서 검증
+        /// </summary>
+        private async void ValidateScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (ScriptCodeTextBox == null)
+                {
+                    return;
+                }
+
+                string scriptCode = ScriptCodeTextBox.Text?.Trim() ?? "";
+                if (string.IsNullOrEmpty(scriptCode))
+                {
+                                         if (ValidationResultTextBlock != null)
+                     {
+                         ValidationResultTextBlock.Text = "스크립트 코드를 입력해주세요.";
+                         ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                     }
+                    return;
+                }
+
+                // 버튼 비활성화 및 상태 표시
+                ValidateScriptButton.IsEnabled = false;
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = "스크립트 검증 중...";
+                }
+
+                if (ValidationResultTextBlock != null)
+                {
+                    ValidationResultTextBlock.Text = "검증 중... 잠시만 기다려주세요.";
+                    ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Blue);
+                }
+
+                // 서버에 검증 요청
+                var validationResult = await _apiService.ValidateScriptAsync(scriptCode);
+
+                if (validationResult != null)
+                {
+                    // 검증 결과 표시
+                    DisplayValidationResult(validationResult);
+                    _loggingService.LogInfo($"스크립트 검증 완료: {validationResult.StatusText}");
+                }
+                else
+                {
+                    if (ValidationResultTextBlock != null)
+                    {
+                        ValidationResultTextBlock.Text = "검증 결과를 받을 수 없습니다. 서버 연결을 확인해주세요.";
+                        ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                if (ValidationResultTextBlock != null)
+                {
+                    ValidationResultTextBlock.Text = $"검증 중 오류 발생: {ex.Message}";
+                    ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                }
+
+                MessageBox.Show($"스크립트 검증 중 오류가 발생했습니다:\n{ex.Message}",
+                              "검증 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 검증 오류: {ex.Message}");
+            }
+            finally
+            {
+                // 버튼 다시 활성화
+                ValidateScriptButton.IsEnabled = true;
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = _isEditingScript ? $"편집 중: {_selectedCustomScript?.Name}" : "준비됨";
+                }
+            }
+        }
+
+        /// <summary>
+        /// 검증 결과를 UI에 표시하는 함수
+        /// </summary>
+        private void DisplayValidationResult(ScriptValidationResult result)
+        {
+            try
+            {
+                if (ValidationResultTextBlock == null)
+                {
+                    return;
+                }
+
+                var sb = new StringBuilder();
+                sb.AppendLine($"검증 결과: {result.StatusText}");
+                sb.AppendLine($"검증 시간: {result.ValidationTimeMs:F1}ms");
+                sb.AppendLine();
+
+                if (result.IsValid)
+                {
+                    sb.AppendLine("✅ 스크립트가 유효합니다!");
+                    ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Green);
+                }
+                else
+                {
+                    sb.AppendLine("❌ 스크립트에 문제가 있습니다:");
+                    ValidationResultTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                }
+
+                // 오류 표시
+                if (result.Errors != null && result.Errors.Count > 0)
+                {
+                    sb.AppendLine("\n🚫 오류:");
+                    foreach (var error in result.Errors)
+                    {
+                        sb.AppendLine($"  • {error}");
+                    }
+                }
+
+                // 경고 표시
+                if (result.Warnings != null && result.Warnings.Count > 0)
+                {
+                    sb.AppendLine("\n⚠️ 경고:");
+                    foreach (var warning in result.Warnings)
+                    {
+                        sb.AppendLine($"  • {warning}");
+                    }
+                }
+
+                ValidationResultTextBlock.Text = sb.ToString();
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"검증 결과 표시 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 저장 버튼 클릭 이벤트
+        /// 새 스크립트 생성 또는 기존 스크립트 수정
+        /// </summary>
+        private async void SaveScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 입력 검증
+                if (!ValidateScriptInput())
+                {
+                    return;
+                }
+
+                // 스크립트 객체 생성
+                var script = CreateScriptFromEditor();
+                if (script == null)
+                {
+                    return;
+                }
+
+                // 버튼 비활성화 및 상태 표시
+                SaveScriptButton.IsEnabled = false;
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = _isEditingScript ? "스크립트 수정 중..." : "스크립트 저장 중...";
+                }
+
+                if (_isEditingScript && _editingScriptId > 0)
+                {
+                    // 기존 스크립트 수정
+                    script.Id = _editingScriptId;
+                    bool success = await _apiService.UpdateCustomScriptAsync(script);
+
+                    if (success)
+                    {
+                        MessageBox.Show("스크립트가 성공적으로 수정되었습니다!", "저장 완료", 
+                                      MessageBoxButton.OK, MessageBoxImage.Information);
+                        _loggingService.LogInfo($"커스텀 스크립트 수정 완료: {script.Name}");
+                    }
+                    else
+                    {
+                        MessageBox.Show("스크립트 수정에 실패했습니다.", "저장 실패", 
+                                      MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                }
+                else
+                {
+                    // 새 스크립트 생성
+                    int newId = await _apiService.CreateCustomScriptAsync(script);
+
+                    if (newId > 0)
+                    {
+                        MessageBox.Show($"새 스크립트가 성공적으로 생성되었습니다! (ID: {newId})", "저장 완료", 
+                                      MessageBoxButton.OK, MessageBoxImage.Information);
+                        _loggingService.LogInfo($"새 커스텀 스크립트 생성 완료: {script.Name} (ID: {newId})");
+
+                        // 편집 모드로 전환
+                        _isEditingScript = true;
+                        _editingScriptId = newId;
+                    }
+                    else
+                    {
+                        MessageBox.Show("스크립트 생성에 실패했습니다.", "저장 실패", 
+                                      MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                }
+
+                // 스크립트 목록 새로고침
+                await LoadCustomScripts();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"스크립트 저장 중 오류가 발생했습니다:\n{ex.Message}",
+                              "저장 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 저장 오류: {ex.Message}");
+            }
+            finally
+            {
+                // 버튼 다시 활성화
+                SaveScriptButton.IsEnabled = true;
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = _isEditingScript ? $"편집 중: {ScriptNameTextBox?.Text}" : "준비됨";
+                }
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 입력 값들을 검증하는 함수
+        /// </summary>
+        private bool ValidateScriptInput()
+        {
+            try
+            {
+                // 이름 검증
+                if (ScriptNameTextBox == null || string.IsNullOrWhiteSpace(ScriptNameTextBox.Text))
+                {
+                    MessageBox.Show("스크립트 이름을 입력해주세요.", "입력 오류", 
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ScriptNameTextBox?.Focus();
+                    return false;
+                }
+
+                // 코드 검증
+                if (ScriptCodeTextBox == null || string.IsNullOrWhiteSpace(ScriptCodeTextBox.Text))
+                {
+                    MessageBox.Show("스크립트 코드를 입력해주세요.", "입력 오류", 
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ScriptCodeTextBox?.Focus();
+                    return false;
+                }
+
+                // 카테고리 검증
+                if (ScriptCategoryEditComboBox == null || string.IsNullOrWhiteSpace(ScriptCategoryEditComboBox.Text))
+                {
+                    MessageBox.Show("카테고리를 선택하거나 입력해주세요.", "입력 오류", 
+                                  MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ScriptCategoryEditComboBox?.Focus();
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"스크립트 입력 검증 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 에디터의 입력값들로부터 CustomScript 객체를 생성하는 함수
+        /// </summary>
+        private CustomScript? CreateScriptFromEditor()
+        {
+            try
+            {
+                return new CustomScript
+                {
+                    Name = ScriptNameTextBox?.Text?.Trim() ?? "",
+                    Description = ScriptDescriptionTextBox?.Text?.Trim() ?? "",
+                    ScriptCode = ScriptCodeTextBox?.Text?.Trim() ?? "",
+                    Category = ScriptCategoryEditComboBox?.Text?.Trim() ?? "",
+                    GameTarget = ScriptGameEditComboBox?.Text?.Trim() ?? "",
+                    IsActive = true
+                };
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"스크립트 객체 생성 중 오류가 발생했습니다:\n{ex.Message}",
+                              "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 객체 생성 오류: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 수정 버튼 클릭 이벤트
+        /// </summary>
+        private void EditScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCustomScript == null)
+            {
+                MessageBox.Show("수정할 스크립트를 선택해주세요.", "선택 오류", 
+                              MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // 이미 에디터에 로드되어 있으므로 별도 작업 불필요
+            MessageBox.Show("선택한 스크립트가 에디터에 로드되었습니다. 수정 후 저장 버튼을 클릭하세요.", 
+                          "편집 모드", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>
+        /// 스크립트 복사 버튼 클릭 이벤트
+        /// </summary>
+        private void CopyScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCustomScript == null)
+            {
+                MessageBox.Show("복사할 스크립트를 선택해주세요.", "선택 오류", 
+                              MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                // 선택된 스크립트를 에디터에 로드 (복사본으로)
+                LoadScriptToEditor(_selectedCustomScript);
+
+                // 새 스크립트 모드로 전환 (ID 초기화)
+                _isEditingScript = false;
+                _editingScriptId = 0;
+
+                // 이름에 "복사본" 추가
+                if (ScriptNameTextBox != null)
+                {
+                    ScriptNameTextBox.Text = $"{_selectedCustomScript.Name} - 복사본";
+                }
+
+                // 에디터 타이틀 변경
+                if (ScriptEditorTitle != null)
+                {
+                    ScriptEditorTitle.Text = "🔧 MSL 스크립트 에디터 - 복사본 작성";
+                }
+
+                MessageBox.Show("스크립트가 복사되었습니다. 필요에 따라 수정 후 저장하세요.", 
+                              "복사 완료", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                _loggingService.LogInfo($"스크립트 복사: {_selectedCustomScript.Name}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"스크립트 복사 중 오류가 발생했습니다:\n{ex.Message}",
+                              "복사 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 복사 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 삭제 버튼 클릭 이벤트
+        /// </summary>
+        private async void DeleteScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCustomScript == null)
+            {
+                MessageBox.Show("삭제할 스크립트를 선택해주세요.", "선택 오류", 
+                              MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                // 삭제 확인
+                var result = MessageBox.Show(
+                    $"정말로 '{_selectedCustomScript.Name}' 스크립트를 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.",
+                    "삭제 확인", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                if (result != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
+                // 삭제 실행
+                bool success = await _apiService.DeleteCustomScriptAsync(_selectedCustomScript.Id);
+
+                if (success)
+                {
+                    MessageBox.Show("스크립트가 성공적으로 삭제되었습니다.", "삭제 완료", 
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    _loggingService.LogInfo($"커스텀 스크립트 삭제 완료: {_selectedCustomScript.Name}");
+
+                    // 에디터 초기화
+                    ClearScriptEditor();
+                    _isEditingScript = false;
+                    _editingScriptId = 0;
+                    _selectedCustomScript = null;
+
+                    // 에디터 타이틀 변경
+                    if (ScriptEditorTitle != null)
+                    {
+                        ScriptEditorTitle.Text = "🔧 MSL 스크립트 에디터";
+                    }
+
+                    // 버튼 비활성화
+                    EnableScriptButtons(false);
+
+                    // 스크립트 목록 새로고침
+                    await LoadCustomScripts();
+                }
+                else
+                {
+                    MessageBox.Show("스크립트 삭제에 실패했습니다.", "삭제 실패", 
+                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"스크립트 삭제 중 오류가 발생했습니다:\n{ex.Message}",
+                              "삭제 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 삭제 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 실행 버튼 클릭 이벤트
+        /// </summary>
+        private async void ExecuteScriptButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedCustomScript == null)
+            {
+                MessageBox.Show("실행할 스크립트를 선택해주세요.", "선택 오류", 
+                              MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                // 버튼 비활성화 및 상태 표시
+                ExecuteScriptButton.IsEnabled = false;
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = $"실행 중: {_selectedCustomScript.Name}";
+                }
+
+                if (ExecutionLogTextBlock != null)
+                {
+                    ExecutionLogTextBlock.Text = "스크립트 실행 중... 잠시만 기다려주세요.";
+                    ExecutionLogTextBlock.Foreground = new SolidColorBrush(Colors.Blue);
+                }
+
+                // 스크립트 실행
+                bool success = await _apiService.ExecuteCustomScriptAsync(_selectedCustomScript.Id);
+
+                if (success)
+                {
+                    if (ExecutionLogTextBlock != null)
+                    {
+                        ExecutionLogTextBlock.Text = $"✅ 스크립트 실행 완료!\n실행 시간: {DateTime.Now:HH:mm:ss}\n" +
+                                                   $"스크립트: {_selectedCustomScript.Name}";
+                        ExecutionLogTextBlock.Foreground = new SolidColorBrush(Colors.Green);
+                    }
+
+                    _loggingService.LogInfo($"커스텀 스크립트 실행 완료: {_selectedCustomScript.Name}");
+                }
+                else
+                {
+                    if (ExecutionLogTextBlock != null)
+                    {
+                        ExecutionLogTextBlock.Text = $"❌ 스크립트 실행 실패\n실행 시간: {DateTime.Now:HH:mm:ss}\n" +
+                                                   $"스크립트: {_selectedCustomScript.Name}\n오류: 서버에서 실행을 거부했습니다.";
+                        ExecutionLogTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                    }
+
+                    MessageBox.Show("스크립트 실행에 실패했습니다.", "실행 실패", 
+                                  MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+
+                // 스크립트 목록 새로고침 (사용 횟수 업데이트 등)
+                await LoadCustomScripts();
+            }
+            catch (Exception ex)
+            {
+                if (ExecutionLogTextBlock != null)
+                {
+                    ExecutionLogTextBlock.Text = $"❌ 스크립트 실행 오류\n실행 시간: {DateTime.Now:HH:mm:ss}\n" +
+                                               $"오류 메시지: {ex.Message}";
+                    ExecutionLogTextBlock.Foreground = new SolidColorBrush(Colors.Red);
+                }
+
+                MessageBox.Show($"스크립트 실행 중 오류가 발생했습니다:\n{ex.Message}",
+                              "실행 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 실행 오류: {ex.Message}");
+            }
+            finally
+            {
+                // 버튼 다시 활성화
+                ExecuteScriptButton.IsEnabled = true;
+                if (ScriptStatusTextBlock != null)
+                {
+                    ScriptStatusTextBlock.Text = _selectedCustomScript != null ? $"선택됨: {_selectedCustomScript.Name}" : "준비됨";
+                }
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 템플릿 보기 버튼 클릭 이벤트
+        /// </summary>
+        private async void ScriptTemplatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 템플릿 목록 조회
+                var templates = await _apiService.GetScriptTemplatesAsync();
+
+                if (templates == null || templates.Count == 0)
+                {
+                    MessageBox.Show("사용 가능한 스크립트 템플릿이 없습니다.", "템플릿 없음", 
+                                  MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // 템플릿 선택 대화상자 (간단한 구현)
+                var templateNames = templates.Select(t => $"{t.Name} ({t.Category} - {t.DifficultyLevel})").ToArray();
+                
+                // TODO: 더 sophisticated한 템플릿 선택 윈도우 구현
+                MessageBox.Show($"사용 가능한 템플릿 {templates.Count}개:\n\n" + 
+                              string.Join("\n", templateNames.Take(10)) + 
+                              (templateNames.Length > 10 ? "\n... 등" : ""), 
+                              "스크립트 템플릿", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                _loggingService.LogInfo($"스크립트 템플릿 조회: {templates.Count}개 발견");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"템플릿 조회 중 오류가 발생했습니다:\n{ex.Message}",
+                              "템플릿 오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                _loggingService.LogError($"스크립트 템플릿 조회 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 스크립트 코드 텍스트 변경 이벤트
+        /// 실시간으로 간단한 구문 확인 가능
+        /// </summary>
+        private void ScriptCodeTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            // TODO: 실시간 문법 하이라이팅 구현 (향후 개선사항)
+            // 현재는 단순히 변경을 감지만 함
         }
     }
 } 
