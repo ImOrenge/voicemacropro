@@ -297,30 +297,31 @@ namespace VoiceMacroPro
             
             if (hasSelection && MacroDataGrid.SelectedItem is Macro selectedMacro)
             {
-                // 커스텀 스크립트인 경우 수정 불가
+                // 커스텀 스크립트인 경우 버튼 텍스트 변경
                 bool isCustomScript = selectedMacro.IsScript;
                 
-                // 커스텀 스크립트가 아닌 경우에만 수정 가능
-                EditMacroButton.IsEnabled = !isCustomScript;
-                
-                // 복사와 삭제는 항상 가능
+                // 모든 버튼 활성화
+                EditMacroButton.IsEnabled = true;
                 CopyMacroButton.IsEnabled = true;
                 DeleteMacroButton.IsEnabled = true;
                 
-                // 커스텀 스크립트인 경우 상태 메시지 업데이트
+                // 커스텀 스크립트 여부에 따라 버튼 텍스트 및 상태 메시지 변경
                 if (isCustomScript)
                 {
-                    UpdateStatusText("커스텀 스크립트는 '커스텀 스크립팅' 탭에서 수정하세요");
+                    EditMacroButton.Content = "🔧 스크립트 편집";
+                    UpdateStatusText($"커스텀 스크립트 선택됨: {selectedMacro.Name} (스크립트 편집 버튼 클릭 시 커스텀 스크립팅 탭으로 이동)");
                 }
                 else
                 {
-                    UpdateStatusText($"선택됨: {selectedMacro.Name}");
+                    EditMacroButton.Content = "✏️ 수정";
+                    UpdateStatusText($"일반 매크로 선택됨: {selectedMacro.Name}");
                 }
             }
             else
             {
-                // 선택된 항목이 없을 때 모든 버튼 비활성화
+                // 선택된 항목이 없을 때 모든 버튼 비활성화 및 기본 텍스트 복원
                 EditMacroButton.IsEnabled = false;
+                EditMacroButton.Content = "✏️ 수정";
                 CopyMacroButton.IsEnabled = false;
                 DeleteMacroButton.IsEnabled = false;
                 UpdateStatusText("준비");
@@ -369,8 +370,8 @@ namespace VoiceMacroPro
 
         /// <summary>
         /// 매크로 수정 버튼 클릭 이벤트 핸들러
-        /// 선택된 매크로를 수정하기 위한 다이얼로그를 표시합니다.
-        /// 커스텀 스크립트인 경우 커스텀 스크립팅 탭으로 안내합니다.
+        /// 일반 매크로인 경우 수정 다이얼로그를 표시하고,
+        /// 커스텀 스크립트인 경우 커스텀 스크립팅 탭으로 이동하여 해당 스크립트를 로드합니다.
         /// </summary>
         private async void EditMacroButton_Click(object sender, RoutedEventArgs e)
         {
@@ -382,17 +383,31 @@ namespace VoiceMacroPro
                     return;
                 }
 
-                // 커스텀 스크립트인 경우 안내 메시지 표시
+                // 커스텀 스크립트인 경우 커스텀 스크립팅 탭으로 이동
                 if (selectedMacro.IsScript)
                 {
-                    MessageBox.Show($"'{selectedMacro.Name}'은(는) 커스텀 스크립트입니다.\n\n" +
-                                  "커스텀 스크립트는 '커스텀 스크립팅' 탭에서 수정하실 수 있습니다.", 
-                                  "커스텀 스크립트 안내", 
-                                  MessageBoxButton.OK, 
-                                  MessageBoxImage.Information);
+                    _loggingService.LogInfo($"커스텀 스크립트 편집 요청: ID {selectedMacro.Id}, 이름 '{selectedMacro.Name}'");
+                    
+                    // 커스텀 스크립팅 탭으로 전환
+                    if (this.FindName("MainTabControl") is TabControl mainTabControl)
+                    {
+                        // 커스텀 스크립팅 탭 찾기 (인덱스 1)
+                        mainTabControl.SelectedIndex = 1;
+                        
+                        // 해당 매크로의 커스텀 스크립트 정보 로드
+                        await LoadCustomScriptByMacroId(selectedMacro.Id);
+                        
+                        UpdateStatusText($"커스텀 스크립트 편집 모드: {selectedMacro.Name}");
+                        
+                        MessageBox.Show($"'{selectedMacro.Name}' 커스텀 스크립트를 편집할 수 있도록\n커스텀 스크립팅 탭으로 이동했습니다.", 
+                                      "커스텀 스크립트 편집", 
+                                      MessageBoxButton.OK, 
+                                      MessageBoxImage.Information);
+                    }
                     return;
                 }
 
+                // 일반 매크로인 경우 기존 편집 다이얼로그 표시
                 var editWindow = new MacroEditWindow(selectedMacro);
                 
                 if (editWindow.ShowDialog() == true && editWindow.MacroResult != null)
@@ -1607,6 +1622,88 @@ namespace VoiceMacroPro
             }
 
             await LoadCustomScripts();
+        }
+
+        /// <summary>
+        /// 매크로 이름으로 커스텀 스크립트를 찾아서 에디터에 로드하는 메서드
+        /// 매크로 관리 탭에서 커스텀 스크립트 편집 버튼을 클릭했을 때 호출됩니다.
+        /// 커스텀 스크립트의 이름이 매크로 이름과 일치하는 것을 찾습니다.
+        /// </summary>
+        /// <param name="macroId">참고용 매크로 ID</param>
+        private async Task LoadCustomScriptByMacroId(int macroId)
+        {
+            try
+            {
+                // 선택된 매크로 정보 가져오기
+                var selectedMacro = MacroDataGrid?.SelectedItem as Macro;
+                if (selectedMacro == null)
+                {
+                    _loggingService.LogWarning("선택된 매크로가 없어서 커스텀 스크립트를 찾을 수 없음");
+                    return;
+                }
+
+                _loggingService.LogDebug($"매크로 '{selectedMacro.Name}' (ID: {macroId})에 해당하는 커스텀 스크립트 검색 시작");
+                
+                // 현재 로드된 스크립트 목록에서 매크로 이름과 일치하는 스크립트 찾기
+                var targetScript = _allCustomScripts.FirstOrDefault(s => 
+                    s.Name.Equals(selectedMacro.Name, StringComparison.OrdinalIgnoreCase));
+                
+                // 로드된 목록에 없으면 서버에서 다시 가져오기
+                if (targetScript == null)
+                {
+                    await LoadCustomScripts();
+                    targetScript = _allCustomScripts.FirstOrDefault(s => 
+                        s.Name.Equals(selectedMacro.Name, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                if (targetScript != null)
+                {
+                    // 스크립트 목록에서 해당 스크립트 선택
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (CustomScriptDataGrid != null)
+                        {
+                            CustomScriptDataGrid.SelectedItem = targetScript;
+                            CustomScriptDataGrid.ScrollIntoView(targetScript);
+                        }
+                    });
+                    
+                    // 에디터에 스크립트 로드
+                    LoadScriptToEditor(targetScript);
+                    
+                    _loggingService.LogInfo($"매크로 '{selectedMacro.Name}'에 해당하는 커스텀 스크립트 '{targetScript.Name}' 로드 완료");
+                }
+                else
+                {
+                    _loggingService.LogWarning($"매크로 '{selectedMacro.Name}'과 일치하는 커스텀 스크립트를 찾을 수 없음");
+                    
+                    // 스크립트를 찾을 수 없는 경우 에디터 초기화
+                    ClearScriptEditor();
+                    
+                    Dispatcher.Invoke(() =>
+                    {
+                        MessageBox.Show($"'{selectedMacro.Name}' 매크로에 해당하는 커스텀 스크립트를 찾을 수 없습니다.\n\n" +
+                                      "• 커스텀 스크립트 이름이 매크로 이름과 정확히 일치해야 합니다.\n" +
+                                      "• 스크립트가 삭제되었거나 아직 생성되지 않았을 수 있습니다.\n\n" +
+                                      "커스텀 스크립팅 탭에서 새로운 스크립트를 생성하거나 기존 스크립트를 수정하세요.", 
+                                      "커스텀 스크립트 없음", 
+                                      MessageBoxButton.OK, 
+                                      MessageBoxImage.Information);
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"매크로 ID {macroId}에 대한 커스텀 스크립트 로드 실패: {ex.Message}");
+                
+                Dispatcher.Invoke(() =>
+                {
+                    MessageBox.Show($"커스텀 스크립트 로드 중 오류가 발생했습니다:\n{ex.Message}", 
+                                  "오류", 
+                                  MessageBoxButton.OK, 
+                                  MessageBoxImage.Error);
+                });
+            }
         }
 
         /// <summary>
