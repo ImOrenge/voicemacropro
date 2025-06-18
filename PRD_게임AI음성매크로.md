@@ -212,6 +212,199 @@
     └── 시스템 리소스 사용량 게이지
 ```
 
+### 3.6 기능 6: 커스텀 매크로 스크립팅 시스템
+
+#### 3.6.1 기능 설명
+사용자가 자유롭게 매크로 동작을 정의할 수 있는 직관적인 스크립팅 언어 시스템
+
+#### 3.6.2 매크로 스크립팅 언어 (MSL - Macro Scripting Language)
+
+##### **기본 문법 규칙**
+- **한 줄 스크립트**: 모든 매크로 동작을 한 줄로 표현
+- **직관적 기호**: 게이머가 쉽게 이해할 수 있는 기호 사용
+- **체이닝 지원**: 여러 동작을 연결하여 복합 매크로 생성
+- **타이밍 제어**: 정밀한 시간 제어 기능
+
+##### **핵심 연산자**
+
+| 연산자 | 설명 | 예시 | 동작 |
+|--------|------|------|------|
+| `,` | 순차 실행 | `W,A,S,D` | W → A → S → D 순서대로 실행 |
+| `+` | 동시 실행 | `W+A+S+D` | W, A, S, D를 동시에 누름 |
+| `>` | 홀드 연결 | `W>A>S>D` | W 누르고 유지하면서 A, S, D 순차 실행 |
+| `\|` | 병렬 실행 | `W\|A\|S\|D` | 독립적인 4개 스레드로 실행 |
+| `~` | 토글 | `~CapsLock` | CapsLock ON/OFF 전환 |
+| `*` | 반복 | `W*5` | W키를 5번 반복 |
+| `&` | 연속 입력 | `Space&100` | Space를 100ms 간격으로 연속 입력 |
+| `%` | 확률 실행 | `W%50` | 50% 확률로 W키 실행 |
+
+##### **타이밍 제어**
+
+| 표현 | 설명 | 예시 | 동작 |
+|------|------|------|------|
+| `(숫자)` | 지연 시간 (ms) | `W(500)A` | W 누르고 500ms 대기 후 A |
+| `[숫자]` | 홀드 시간 (ms) | `W[1000]` | W키를 1초간 홀드 |
+| `{숫자}` | 반복 간격 (ms) | `W*5{200}` | W키를 200ms 간격으로 5번 |
+| `<숫자>` | 페이드 시간 (ms) | `W<100>A` | W에서 A로 100ms에 걸쳐 전환 |
+
+##### **고급 기능**
+
+| 기능 | 문법 | 예시 | 설명 |
+|------|------|------|------|
+| **그룹화** | `(...)` | `(W+A),S,D` | W+A를 그룹으로 묶어 순차 실행 |
+| **조건부 실행** | `?조건:` | `?HP<50:Heal` | HP가 50% 미만일 때만 힐 실행 |
+| **변수 사용** | `$변수명` | `$combo1,W,A` | 미리 정의된 콤보 사용 |
+| **마우스 제어** | `@좌표` | `@(100,200)` | 마우스를 (100,200) 좌표로 이동 |
+| **휠 제어** | `wheel+/-` | `wheel+3` | 마우스 휠 3번 위로 스크롤 |
+
+#### 3.6.3 실제 사용 예시
+
+##### **기본 예시**
+```
+# 순차적으로 키 누르기
+W,A,S,D
+
+# 동시에 키 누르기  
+W+A+S+D
+
+# 순차적으로 누르면서 홀드
+W>A>S>D
+
+# 지연 시간을 포함한 콤보
+Q(100)W(150)E(200)R
+
+# 키를 홀드하면서 다른 키 실행
+Shift[2000]+(W,A,S,D)
+
+# 반복 실행
+Space*10{50}
+
+# 확률적 실행 (크리티컬 스킬)
+CriticalSkill%30
+
+# 토글 기능
+~CapsLock,(W,A,S,D),~CapsLock
+```
+
+##### **고급 예시**
+```
+# 복합 콤보 (격투 게임)
+Down+Forward,Punch(50)Kick(100)*3
+
+# MMO 스킬 로테이션
+Skill1(1000)Skill2(800)Skill3(1200)Buff%20
+
+# FPS 리코일 제어
+MouseDown[100]@(0,-5)@(0,-3)@(0,-2)MouseUp
+
+# RTS 빌드 오더
+B(50)H(50)P*5{200}(100)B(50)S
+
+# 자동 파밍 (조건부)
+?MP>80:FireBall,?MP<20:ManaPotion
+
+# 팀 전투 매크로
+ChatTeam:"Attack!"(500)+Attack+Move@EnemyBase
+
+# 연속 점프 (플랫포머)
+Space[200]+(Left*3)(300)Space[200]+(Right*3)
+```
+
+#### 3.6.4 스크립팅 시스템 아키텍처
+
+##### **파서 및 인터프리터**
+- **어휘 분석**: 스크립트를 토큰으로 분해
+- **구문 분석**: AST(Abstract Syntax Tree) 생성
+- **의미 분석**: 유효성 검사 및 최적화
+- **실행 엔진**: 실시간 매크로 실행
+
+##### **실행 시간 최적화**
+- **컴파일 캐싱**: 자주 사용되는 스크립트 미리 컴파일
+- **병렬 처리**: 독립적인 동작의 멀티스레딩
+- **지연 로딩**: 필요 시점에만 리소스 로드
+- **메모리 풀링**: 객체 재사용으로 GC 압박 최소화
+
+#### 3.6.5 개발자 도구
+
+##### **스크립트 에디터**
+- **실시간 구문 강조**: 키워드, 연산자, 숫자별 색상 구분
+- **자동 완성**: 키 이름, 함수, 변수 자동 완성
+- **오류 검출**: 실시간 문법 검사 및 오류 표시
+- **스마트 들여쓰기**: 자동 코드 포맷팅
+
+##### **디버깅 도구**
+- **단계별 실행**: 스크립트를 한 단계씩 실행
+- **중단점 설정**: 특정 지점에서 실행 일시 정지
+- **변수 감시**: 실행 중 변수 값 실시간 모니터링
+- **실행 로그**: 각 단계의 실행 시간 및 결과 기록
+
+##### **성능 분석기**
+- **실행 시간 측정**: 각 구문의 실행 시간 분석
+- **병목점 탐지**: 느린 구간 자동 탐지
+- **메모리 사용량**: 스크립트별 메모리 사용량 추적
+- **최적화 제안**: AI 기반 성능 개선 제안
+
+#### 3.6.6 사용자 인터페이스
+
+```
+[커스텀 스크립팅] 탭
+├── 스크립트 에디터 영역
+│   ├── 문법 강조 텍스트 에디터
+│   ├── 줄 번호 표시
+│   ├── 자동 완성 팝업
+│   └── 오류 밑줄 표시
+├── 도구 모음
+│   ├── [새 스크립트] [열기] [저장] [실행] 버튼
+│   ├── [디버그] [단계 실행] [중단점] 버튼
+│   └── [문법 검사] [성능 분석] 버튼
+├── 미리보기 패널
+│   ├── 파싱된 AST 트리 표시
+│   ├── 예상 실행 시간 계산
+│   └── 키 입력 시뮬레이션 애니메이션
+├── 템플릿 라이브러리
+│   ├── 게임별 스크립트 템플릿
+│   ├── 사용자 정의 템플릿
+│   └── 커뮤니티 공유 스크립트
+└── 하단 상태창
+    ├── 파싱 결과 및 오류 메시지
+    ├── 실행 상태 및 진행률
+    └── 성능 통계 (실행 시간, 메모리 사용량)
+```
+
+#### 3.6.7 확장 기능
+
+##### **스크립트 라이브러리**
+- **게임별 프리셋**: 인기 게임의 최적화된 스크립트 모음
+- **사용자 기여**: 커뮤니티에서 제작한 스크립트 공유
+- **프로 게이머 스크립트**: 프로 선수들이 실제 사용하는 스크립트
+- **버전 관리**: Git 기반 스크립트 버전 관리
+
+##### **AI 어시스턴트**
+- **자연어 변환**: "3번 점프한 후 공격" → `Space*3{200}Attack`
+- **스크립트 최적화**: 비효율적인 구문 자동 개선
+- **게임 인식**: 실행 중인 게임에 맞는 스크립트 제안
+- **학습 기능**: 사용자 패턴 학습 후 맞춤 스크립트 생성
+
+##### **통합 개발 환경**
+- **프로젝트 관리**: 여러 스크립트 파일을 프로젝트 단위로 관리
+- **버전 제어**: 스크립트 변경사항 추적 및 복원
+- **팀 협업**: 스크립트 공동 편집 및 리뷰 시스템
+- **CI/CD**: 스크립트 자동 테스트 및 배포
+
+#### 3.6.8 보안 및 안전성
+
+##### **샌드박스 실행**
+- **권한 제한**: 시스템 파일 접근 금지
+- **리소스 제한**: CPU, 메모리 사용량 제한
+- **타임아웃**: 무한 루프 방지
+- **격리 실행**: 다른 프로세스에 영향 없는 실행
+
+##### **코드 검증**
+- **정적 분석**: 컴파일 시점 보안 취약점 검사
+- **동적 분석**: 실행 중 비정상 동작 감지
+- **화이트리스트**: 허용된 API만 사용 가능
+- **디지털 서명**: 신뢰할 수 있는 스크립트 검증
+
 ## 4. 시스템 아키텍처
 
 ### 4.1 전체 구조도
@@ -219,14 +412,36 @@
 ┌─────────────────┐    HTTP/WebSocket    ┌─────────────────┐
 │   C# WPF UI     │ ◄─────────────────► │   Python API    │
 │   (프론트엔드)    │                     │   (백엔드)       │
-└─────────────────┘                     └─────────────────┘
-         │                                        │
-         │                                        │
-         ▼                                        ▼
-┌─────────────────┐                     ┌─────────────────┐
-│   Local Config  │                     │   SQLite DB     │
-│   Files (.json) │                     │   (매크로 저장)   │
-└─────────────────┘                     └─────────────────┘
+│  ┌─────────────┐ │                     │  ┌─────────────┐│
+│  │Script Editor│ │                     │  │MSL Compiler │││
+│  │Syntax Highlight│                    │  │& Interpreter│││
+│  │Auto Complete│ │                     │  └─────────────┘│
+│  └─────────────┘ │                     └─────────────────┘
+└─────────────────┘                              │
+         │                                       │
+         │                                       ▼
+         ▼                              ┌─────────────────┐
+┌─────────────────┐                     │ Script Engine   │
+│   Local Config  │                     │ ┌─────────────┐ │
+│   Files (.json) │                     │ │  AST Parser │ │
+│ ┌─────────────┐ │                     │ │ Performance │ │
+│ │Script Cache │ │                     │ │ Optimizer   │ │
+│ │Templates    │ │                     │ │ Security    │ │
+│ └─────────────┘ │                     │ │ Validator   │ │
+└─────────────────┘                     │ └─────────────┘ │
+                                        └─────────────────┘
+                                                 │
+                                                 ▼
+                                       ┌─────────────────┐
+                                       │   SQLite DB     │
+                                       │ ┌─────────────┐ │
+                                       │ │   Macros    │ │
+                                       │ │Custom Scripts│ │
+                                       │ │ Templates   │ │
+                                       │ │ Variables   │ │
+                                       │ │Performance  │ │
+                                       │ └─────────────┘ │
+                                       └─────────────────┘
                                                  │
                                                  ▼
                                        ┌─────────────────┐
@@ -236,24 +451,93 @@
                                                  │
                                                  ▼
                                        ┌─────────────────┐
-                                       │  Input Control  │
-                                       │  (PyAutoGUI)    │
+                                       │ Execution Engine│
+                                       │ ┌─────────────┐ │
+                                       │ │MSL Runtime  │ │
+                                       │ │PyAutoGUI    │ │
+                                       │ │Input Control│ │
+                                       │ │Multi-thread │ │
+                                       │ │Safety Check │ │
+                                       │ └─────────────┘ │
                                        └─────────────────┘
 ```
 
 ### 4.2 데이터베이스 스키마
 ```sql
--- 매크로 테이블
+-- 매크로 테이블 (기존 5가지 타입 + 커스텀 스크립팅 지원)
 CREATE TABLE macros (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     voice_command TEXT NOT NULL,
-    action_type TEXT NOT NULL, -- combo, rapid, hold, toggle, repeat
-    key_sequence TEXT NOT NULL, -- JSON format
+    action_type TEXT NOT NULL, -- combo, rapid, hold, toggle, repeat, custom_script
+    key_sequence TEXT NOT NULL, -- JSON format 또는 스크립트 코드
     settings TEXT, -- JSON format for type-specific settings
+    script_language TEXT DEFAULT 'MSL', -- 스크립팅 언어 타입 (MSL, 향후 확장 가능)
+    is_script BOOLEAN DEFAULT FALSE, -- 스크립트 기반 매크로 여부
+    script_version TEXT DEFAULT '1.0', -- 스크립트 언어 버전
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    usage_count INTEGER DEFAULT 0
+    usage_count INTEGER DEFAULT 0,
+    execution_time_avg REAL DEFAULT 0, -- 평균 실행 시간 (ms)
+    success_rate REAL DEFAULT 100 -- 실행 성공률 (%)
+);
+
+-- 커스텀 스크립트 테이블
+CREATE TABLE custom_scripts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    macro_id INTEGER NOT NULL,
+    script_code TEXT NOT NULL, -- MSL 스크립트 코드
+    compiled_code BLOB, -- 컴파일된 바이트코드 (성능 최적화)
+    ast_tree TEXT, -- JSON 형태의 AST 트리
+    dependencies TEXT, -- JSON 배열: 의존성 목록
+    variables TEXT, -- JSON 객체: 스크립트 변수
+    performance_data TEXT, -- JSON: 성능 분석 데이터
+    security_hash TEXT, -- 스크립트 무결성 검증용 해시
+    is_validated BOOLEAN DEFAULT FALSE, -- 보안 검증 완료 여부
+    validation_date DATETIME, -- 마지막 검증 날짜
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (macro_id) REFERENCES macros (id) ON DELETE CASCADE
+);
+
+-- 스크립트 템플릿 테이블
+CREATE TABLE script_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT NOT NULL, -- game_type, combo_type, etc.
+    game_title TEXT, -- 특정 게임용 템플릿인 경우
+    template_code TEXT NOT NULL, -- MSL 템플릿 코드
+    parameters TEXT, -- JSON: 템플릿 매개변수 정의
+    preview_gif BLOB, -- 실행 미리보기 애니메이션
+    difficulty_level INTEGER DEFAULT 1, -- 1(초급) ~ 5(고급)
+    popularity_score INTEGER DEFAULT 0, -- 인기도 점수
+    author_name TEXT,
+    is_official BOOLEAN DEFAULT FALSE, -- 공식 템플릿 여부
+    is_public BOOLEAN DEFAULT TRUE, -- 공개 여부
+    download_count INTEGER DEFAULT 0,
+    rating_average REAL DEFAULT 0, -- 평균 평점
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 스크립트 실행 로그 테이블
+CREATE TABLE script_execution_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    macro_id INTEGER NOT NULL,
+    script_id INTEGER,
+    execution_start DATETIME DEFAULT CURRENT_TIMESTAMP,
+    execution_end DATETIME,
+    execution_time_ms INTEGER, -- 실행 시간 (밀리초)
+    success BOOLEAN DEFAULT FALSE,
+    error_message TEXT, -- 실패 시 오류 메시지
+    input_parameters TEXT, -- JSON: 실행 시 입력 매개변수
+    output_result TEXT, -- JSON: 실행 결과
+    performance_metrics TEXT, -- JSON: 성능 메트릭
+    memory_usage_kb INTEGER, -- 메모리 사용량 (KB)
+    cpu_usage_percent REAL, -- CPU 사용률
+    FOREIGN KEY (macro_id) REFERENCES macros (id) ON DELETE CASCADE,
+    FOREIGN KEY (script_id) REFERENCES custom_scripts (id) ON DELETE SET NULL
 );
 
 -- 프리셋 테이블
@@ -275,6 +559,47 @@ CREATE TABLE logs (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (macro_id) REFERENCES macros (id)
 );
+
+-- 스크립트 변수 저장소 테이블
+CREATE TABLE script_variables (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    variable_name TEXT NOT NULL UNIQUE,
+    variable_value TEXT NOT NULL, -- JSON 형태로 저장
+    variable_type TEXT NOT NULL, -- string, number, boolean, object, array
+    scope TEXT DEFAULT 'global', -- global, session, macro
+    description TEXT,
+    is_persistent BOOLEAN DEFAULT TRUE, -- 재시작 후에도 유지 여부
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 스크립트 성능 분석 테이블
+CREATE TABLE script_performance_analysis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    script_id INTEGER NOT NULL,
+    analysis_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    total_executions INTEGER DEFAULT 0,
+    average_execution_time REAL, -- 평균 실행 시간 (ms)
+    min_execution_time REAL, -- 최소 실행 시간 (ms)
+    max_execution_time REAL, -- 최대 실행 시간 (ms)
+    success_rate REAL, -- 성공률 (%)
+    memory_efficiency_score REAL, -- 메모리 효율성 점수
+    cpu_efficiency_score REAL, -- CPU 효율성 점수
+    bottleneck_operations TEXT, -- JSON: 병목 구간 분석
+    optimization_suggestions TEXT, -- JSON: 최적화 제안
+    FOREIGN KEY (script_id) REFERENCES custom_scripts (id) ON DELETE CASCADE
+);
+
+-- 인덱스 생성 (성능 최적화)
+CREATE INDEX idx_macros_action_type ON macros(action_type);
+CREATE INDEX idx_macros_is_script ON macros(is_script);
+CREATE INDEX idx_custom_scripts_macro_id ON custom_scripts(macro_id);
+CREATE INDEX idx_script_templates_category ON script_templates(category);
+CREATE INDEX idx_script_templates_game_title ON script_templates(game_title);
+CREATE INDEX idx_script_execution_logs_macro_id ON script_execution_logs(macro_id);
+CREATE INDEX idx_script_execution_logs_execution_start ON script_execution_logs(execution_start);
+CREATE INDEX idx_script_variables_scope ON script_variables(scope);
+CREATE INDEX idx_script_performance_analysis_script_id ON script_performance_analysis(script_id);
 ```
 
 ## 5. 개발 계획 및 우선순위
@@ -303,6 +628,28 @@ CREATE TABLE logs (
 - 로그 시스템 구현
 - 성능 모니터링 기능
 - 버그 수정 및 최적화
+
+### 5.6 6단계: 커스텀 매크로 스크립팅 시스템 (3주)
+
+#### 5.6.1 1주차: 스크립팅 언어 설계 및 파서 구현
+- **MSL 문법 정의**: 연산자, 구문, 키워드 명세
+- **어휘 분석기**: 토큰화 및 기본 파싱
+- **구문 분석기**: AST 생성 및 문법 검증
+- **기본 테스트**: 단순 스크립트 파싱 테스트
+
+#### 5.6.2 2주차: 실행 엔진 및 UI 구현
+- **MSL 인터프리터**: AST 기반 스크립트 실행
+- **스크립트 에디터**: 구문 강조, 자동 완성
+- **실행 환경**: 샌드박스, 보안 제약
+- **기본 연산자**: `,`, `+`, `>`, `*`, `()`, `[]` 구현
+
+#### 5.6.3 3주차: 고급 기능 및 통합
+- **고급 연산자**: `|`, `~`, `&`, `%`, `<>` 구현
+- **변수 시스템**: 전역/지역 변수, 타입 시스템
+- **템플릿 시스템**: 게임별 템플릿, 라이브러리
+- **성능 최적화**: 컴파일 캐싱, 실행 최적화
+- **보안 강화**: 코드 검증, 권한 제한
+- **통합 테스트**: 전체 시스템 통합 및 테스트
 
 ## 6. 심화 기술 구현 및 고도화
 
