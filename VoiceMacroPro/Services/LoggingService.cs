@@ -184,7 +184,7 @@ namespace VoiceMacroPro.Services
         /// 로깅 서비스 생성자
         /// 로그 파일 경로를 설정하고 초기화합니다.
         /// </summary>
-        private LoggingService()
+        public LoggingService()
         {
             // 로그 폴더 생성
             var logDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs");
@@ -281,6 +281,8 @@ namespace VoiceMacroPro.Services
                     LogEntries.RemoveAt(0);
                 }
 
+                // PropertyChanged 이벤트 발생
+                OnPropertyChanged(nameof(LogEntries));
                 OnPropertyChanged(nameof(TotalLogCount));
             });
 

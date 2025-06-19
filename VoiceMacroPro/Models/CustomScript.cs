@@ -180,8 +180,14 @@ namespace VoiceMacroPro.Models
             {
                 _gameTarget = value ?? "";
                 OnPropertyChanged(nameof(GameTarget));
+                OnPropertyChanged(nameof(GameTitle));
             }
         }
+
+        /// <summary>
+        /// 게임 제목 (UI 표시용 - GameTarget과 동일한 값)
+        /// </summary>
+        public string GameTitle => GameTarget;
 
         /// <summary>
         /// 스크립트 버전

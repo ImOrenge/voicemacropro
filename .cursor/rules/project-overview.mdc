@@ -1,0 +1,81 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# VoiceMacro Pro 프로젝트 개요
+
+## 📋 프로젝트 소개
+VoiceMacro Pro는 게임 AI 음성 매크로 프로그램으로, 음성 명령을 통해 복잡한 키보드/마우스 조작을 자동화할 수 있는 프로그램입니다.
+
+## 🏗️ 아키텍처 구조
+
+### 프론트엔드 (C# WPF)
+- **메인 윈도우**: [MainWindow.xaml](mdc:VoiceMacroPro/MainWindow.xaml) - 애플리케이션의 메인 UI
+- **뷰 컴포넌트들**:
+  - [DashboardView.xaml](mdc:VoiceMacroPro/Views/DashboardView.xaml) - 대시보드 화면
+  - [MacroManagementView.xaml](mdc:VoiceMacroPro/Views/MacroManagementView.xaml) - 매크로 관리
+  - [VoiceRecognitionView.xaml](mdc:VoiceMacroPro/Views/VoiceRecognitionView.xaml) - 음성 인식
+  - [CustomScriptingView.xaml](mdc:VoiceMacroPro/Views/CustomScriptingView.xaml) - 커스텀 스크립팅
+
+### 백엔드 (Python)
+- **핵심 서비스들**:
+  - [backend/services/macro_service.py](mdc:backend/services/macro_service.py) - 매크로 관리
+  - [backend/services/voice_service.py](mdc:backend/services/voice_service.py) - 음성 인식
+  - [backend/services/whisper_service.py](mdc:backend/services/whisper_service.py) - Whisper AI 통합
+  - [backend/api/server.py](mdc:backend/api/server.py) - API 서버
+
+### MSL (Macro Scripting Language) 시스템
+- **파서 및 인터프리터**:
+  - [backend/parsers/msl_lexer.py](mdc:backend/parsers/msl_lexer.py) - 어휘 분석기
+  - [backend/parsers/msl_parser.py](mdc:backend/parsers/msl_parser.py) - 구문 분석기
+  - [backend/parsers/msl_ast.py](mdc:backend/parsers/msl_ast.py) - AST 노드 정의
+  - [backend/parsers/msl_interpreter.py](mdc:backend/parsers/msl_interpreter.py) - 스크립트 실행기
+
+## 📁 주요 디렉토리 구조
+
+```
+Gamesuport/
+├── backend/                  # Python 백엔드
+│   ├── api/                 # API 서버
+│   ├── database/            # 데이터베이스 관리
+│   ├── models/              # 데이터 모델
+│   ├── parsers/             # MSL 파서/인터프리터
+│   ├── services/            # 비즈니스 로직
+│   └── utils/               # 공통 유틸리티
+└── VoiceMacroPro/           # C# WPF 프론트엔드
+    ├── Models/              # 데이터 모델
+    ├── Services/            # API 통신 서비스
+    ├── Utils/               # UI 공통 유틸리티
+    └── Views/               # UI 화면들
+```
+
+## 🔧 주요 기능
+
+### 1. 매크로 관리 시스템
+- 매크로 CRUD (생성, 조회, 수정, 삭제)
+- 다양한 매크로 타입 지원 (콤보, 연사, 홀드, 토글, 반복)
+- 음성 명령어와 키 시퀀스 매핑
+
+### 2. 음성 인식 시스템  
+- OpenAI Whisper 기반 고정밀 음성 인식
+- 실시간 음성 녹음 및 처리
+- 명령어 매칭 및 확신도 계산
+
+### 3. 커스텀 스크립팅 (MSL)
+- 직관적인 매크로 스크립팅 언어
+- 실시간 구문 검사 및 자동 완성
+- 복잡한 매크로 로직 구현 가능
+
+### 4. 프리셋 관리
+- 매크로 집합을 프리셋으로 관리
+- 게임별/상황별 프리셋 전환
+- 프리셋 내보내기/가져오기
+
+## 🛠️ 개발 규칙
+프로젝트 개발 시 [DEVELOPMENT_RULES.md](mdc:DEVELOPMENT_RULES.md)와 [macro-developrule.mdc](mdc:.cursor/rules/macro-developrule.mdc)의 규칙을 준수해야 합니다.
+
+## 📖 상세 요구사항
+전체 기능 요구사항은 [PRD_게임AI음성매크로.md](mdc:PRD_게임AI음성매크로.md)에서 확인할 수 있습니다.
+
+

@@ -251,7 +251,7 @@ class MacroService:
         if script_rows:
             self._log_action("INFO", f"매크로 삭제 (스크립트 포함): {macro['name']}", macro_id)
         else:
-        self._log_action("INFO", f"매크로 삭제: {macro['name']}", macro_id)
+            self._log_action("INFO", f"매크로 삭제: {macro['name']}", macro_id)
         
         return True
     

@@ -1,0 +1,177 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# API 통합 및 통신 가이드
+
+## 🌐 API 아키텍처 개요
+VoiceMacro Pro는 Python Flask 백엔드와 C# WPF 프론트엔드 간의 HTTP API 통신을 사용합니다.
+
+## 🔧 백엔드 API 구조
+
+### API 서버
+- **메인 서버**: [backend/api/server.py](mdc:backend/api/server.py) - Flask 기반 REST API 서버
+- **서버 실행**: [run_server.py](mdc:run_server.py) - 개발환경 서버 시작점
+- **배치 실행**: [start_server.bat](mdc:start_server.bat) - Windows 배치 파일
+
+### 핵심 서비스 API
+- **매크로 서비스**: [backend/services/macro_service.py](mdc:backend/services/macro_service.py)
+  - 매크로 CRUD 작업
+  - 매크로 실행 및 관리
+  
+- **음성 서비스**: [backend/services/voice_service.py](mdc:backend/services/voice_service.py)
+  - 음성 인식 처리
+  - Whisper AI 통합
+  
+- **매크로 매칭**: [backend/services/macro_matching_service.py](mdc:backend/services/macro_matching_service.py)
+  - 음성 명령어와 매크로 매칭
+  - 유사도 기반 검색
+
+## 🔗 프론트엔드 API 통신
+
+### API 서비스 클래스
+- **ApiService**: [VoiceMacroPro/Services/ApiService.cs](mdc:VoiceMacroPro/Services/ApiService.cs)
+  - HTTP 클라이언트 래퍼
+  - API 엔드포인트 추상화
+  - 오류 처리 및 재시도 로직
+
+### 사용 예시
+```csharp
+// 매크로 목록 조회
+var macros = await ApiService.GetMacrosAsync();
+
+// 새 매크로 생성
+var newMacro = new Macro { Name = "테스트", VoiceCommand = "공격" };
+await ApiService.CreateMacroAsync(newMacro);
+
+// 음성 인식 요청
+var result = await ApiService.RecognizeVoiceAsync(audioData);
+```
+
+## 📡 API 엔드포인트 명세
+
+### 매크로 관리 API
+```
+GET    /api/macros           # 매크로 목록 조회
+GET    /api/macros/{id}      # 특정 매크로 조회  
+POST   /api/macros           # 새 매크로 생성
+PUT    /api/macros/{id}      # 매크로 수정
+DELETE /api/macros/{id}      # 매크로 삭제
+POST   /api/macros/{id}/execute  # 매크로 실행
+```
+
+### 음성 인식 API
+```
+POST   /api/voice/recognize      # 음성 파일 인식
+POST   /api/voice/match-command  # 음성과 매크로 매칭
+GET    /api/voice/status         # 음성 인식 상태
+```
+
+### 커스텀 스크립팅 API
+```
+POST   /api/scripts/parse        # MSL 스크립트 파싱
+POST   /api/scripts/execute      # 스크립트 실행
+POST   /api/scripts/validate     # 스크립트 유효성 검사
+```
+
+## 🛠️ 개발 및 테스트
+
+### 서버 시작 방법
+```bash
+# Python으로 직접 실행
+py run_server.py
+
+# 배치 파일 실행 (Windows)
+start_server.bat
+```
+
+### API 테스트 도구
+- **테스트 스크립트**: [backend/tests/test_api_response.py](mdc:backend/tests/test_api_response.py)
+- **C# API 테스트**: [backend/tests/test_csharp_api_call.py](mdc:backend/tests/test_csharp_api_call.py)
+- **통합 테스트**: [backend/tests/test_complete_pipeline.py](mdc:backend/tests/test_complete_pipeline.py)
+
+### API 응답 형식
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "성공 메시지",
+  "error": null,
+  "timestamp": "2025-01-18T10:30:00Z"
+}
+```
+
+## 🚨 오류 처리 가이드
+
+### 일반적인 API 오류
+- **404**: 리소스를 찾을 수 없음
+- **400**: 잘못된 요청 데이터
+- **500**: 서버 내부 오류
+- **503**: 서비스 일시 불가
+
+### C# 오류 처리 패턴
+```csharp
+try
+{
+    var result = await ApiService.GetMacrosAsync();
+    // 성공 처리
+}
+catch (HttpRequestException ex)
+{
+    // 네트워크 오류
+    UIHelper.ShowError($"서버 연결 실패: {ex.Message}");
+}
+catch (ApiException ex)
+{
+    // API 비즈니스 로직 오류
+    UIHelper.ShowError($"API 오류: {ex.Message}");
+}
+```
+
+## 🔒 보안 및 인증
+
+### 현재 구현
+- 로컬 서버 통신 (127.0.0.1)
+- 기본 HTTP 프로토콜
+- 인증 시스템 미구현 (향후 확장 예정)
+
+### 향후 보안 강화 계획
+- HTTPS 프로토콜 적용
+- JWT 토큰 기반 인증
+- API 키 기반 접근 제어
+- 요청 속도 제한 (Rate Limiting)
+
+## 📊 성능 모니터링
+
+### 로깅 시스템
+- **로깅 서비스**: [VoiceMacroPro/Services/LoggingService.cs](mdc:VoiceMacroPro/Services/LoggingService.cs)
+- **백엔드 로깅**: Python logging 모듈 사용
+- **API 응답 시간 측정**: 자동 로깅
+
+### 성능 최적화 포인트
+- API 응답 캐싱
+- 대용량 데이터 페이징
+- 비동기 요청 처리
+- 연결 풀링 최적화
+
+## 🔧 개발 설정
+
+### 환경 변수
+```bash
+# API 서버 설정
+API_HOST=127.0.0.1
+API_PORT=5000
+DEBUG_MODE=True
+
+# 데이터베이스 설정
+DB_PATH=voice_macro.db
+```
+
+### 의존성 관리
+- **Python**: [requirements.txt](mdc:requirements.txt)
+- **C#**: NuGet 패키지 관리 (.csproj 파일)
+
+## 📚 관련 문서
+- **API 상세 명세**: [PRD_게임AI음성매크로.md](mdc:PRD_게임AI음성매크로.md) 섹션 4
+- **데이터베이스 스키마**: [backend/database/database_manager.py](mdc:backend/database/database_manager.py)

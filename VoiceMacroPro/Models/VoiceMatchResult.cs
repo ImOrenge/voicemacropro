@@ -15,6 +15,8 @@ namespace VoiceMacroPro.Models
         private double _confidence;
         private string _actionDescription = string.Empty;
         private int _macroId;
+        private string _recognizedText = string.Empty;
+        private bool _isExecuted;
 
         /// <summary>
         /// 매칭 순위 (1, 2, 3, ...)
@@ -116,6 +118,44 @@ namespace VoiceMacroPro.Models
                 OnPropertyChanged(nameof(MacroId));
             }
         }
+
+        /// <summary>
+        /// 인식된 텍스트 (음성 인식 결과)
+        /// </summary>
+        public string RecognizedText
+        {
+            get => _recognizedText;
+            set
+            {
+                _recognizedText = value;
+                OnPropertyChanged(nameof(RecognizedText));
+            }
+        }
+
+        /// <summary>
+        /// 매크로 실행 여부
+        /// </summary>
+        public bool IsExecuted
+        {
+            get => _isExecuted;
+            set
+            {
+                _isExecuted = value;
+                OnPropertyChanged(nameof(IsExecuted));
+                OnPropertyChanged(nameof(ExecutionStatusText));
+                OnPropertyChanged(nameof(ExecutionStatusColor));
+            }
+        }
+
+        /// <summary>
+        /// 실행 상태 텍스트 (UI 표시용)
+        /// </summary>
+        public string ExecutionStatusText => IsExecuted ? "실행됨" : "대기중";
+
+        /// <summary>
+        /// 실행 상태 색상 (UI 표시용)
+        /// </summary>
+        public string ExecutionStatusColor => IsExecuted ? "#4CAF50" : "#FF9800";
 
         /// <summary>
         /// 프로퍼티 변경 이벤트

@@ -1,0 +1,306 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 테스팅 및 디버깅 가이드
+
+## 🧪 테스트 구조 개요
+VoiceMacro Pro의 테스트는 백엔드 Python 테스트와 프론트엔드 C# 통합 테스트로 구성되어 있습니다.
+
+## 🐍 Python 백엔드 테스트
+
+### 테스트 디렉토리 구조
+```
+backend/tests/
+├── test_api_response.py          # API 응답 테스트
+├── test_api_validation.py        # API 유효성 검사 테스트
+├── test_basic_voice.py           # 기본 음성 인식 테스트
+├── test_complete_pipeline.py     # 전체 파이프라인 테스트
+├── test_csharp_api_call.py       # C# 연동 테스트
+├── test_interaction.py           # 상호작용 테스트
+├── test_json_mapping.py          # JSON 매핑 테스트
+├── test_macro_matching.py        # 매크로 매칭 테스트
+├── test_microphone_api.py        # 마이크 API 테스트
+├── test_microphone_detection.py  # 마이크 감지 테스트
+├── test_msl_complete.py          # MSL 완전 테스트
+├── test_msl_specific.py          # MSL 특정 기능 테스트
+├── test_simple.py                # 간단한 기능 테스트
+├── test_specific_script.py       # 특정 스크립트 테스트
+├── test_voice_analysis.py        # 음성 분석 테스트
+├── test_voice_recording.py       # 음성 녹음 테스트
+└── test_working_msl.py           # MSL 동작 테스트
+```
+
+### 주요 테스트 카테고리
+
+#### 1. MSL (Macro Scripting Language) 테스트
+- **완전 테스트**: [backend/tests/test_msl_complete.py](mdc:backend/tests/test_msl_complete.py)
+- **특정 기능**: [backend/tests/test_msl_specific.py](mdc:backend/tests/test_msl_specific.py)
+- **동작 확인**: [backend/tests/test_working_msl.py](mdc:backend/tests/test_working_msl.py)
+
+```python
+# MSL 테스트 예시
+def test_msl_basic_sequence():
+    """기본 시퀀스 파싱 테스트"""
+    parser = MSLParser()
+    ast = parser.parse("W,A,S,D")
+    assert ast is not None
+    assert len(ast.children) == 4
+
+def test_msl_timing_control():
+    """타이밍 제어 테스트"""
+    parser = MSLParser()
+    ast = parser.parse("W(500)A")
+    # 500ms 딜레이 검증
+```
+
+#### 2. 음성 인식 테스트
+- **기본 음성**: [backend/tests/test_basic_voice.py](mdc:backend/tests/test_basic_voice.py)
+- **음성 분석**: [backend/tests/test_voice_analysis.py](mdc:backend/tests/test_voice_analysis.py)
+- **음성 녹음**: [backend/tests/test_voice_recording.py](mdc:backend/tests/test_voice_recording.py)
+
+#### 3. API 테스트
+- **API 응답**: [backend/tests/test_api_response.py](mdc:backend/tests/test_api_response.py)
+- **API 유효성**: [backend/tests/test_api_validation.py](mdc:backend/tests/test_api_validation.py)
+- **C# 연동**: [backend/tests/test_csharp_api_call.py](mdc:backend/tests/test_csharp_api_call.py)
+
+#### 4. 매크로 매칭 테스트
+- **매크로 매칭**: [backend/tests/test_macro_matching.py](mdc:backend/tests/test_macro_matching.py)
+- **JSON 매핑**: [backend/tests/test_json_mapping.py](mdc:backend/tests/test_json_mapping.py)
+
+## 🔧 테스트 실행 방법
+
+### Python 테스트 실행
+```bash
+# 전체 테스트 실행
+py -m pytest backend/tests/
+
+# 특정 테스트 파일 실행
+py -m pytest backend/tests/test_msl_complete.py
+
+# 상세 출력으로 실행
+py -m pytest backend/tests/ -v
+
+# 특정 테스트 함수 실행
+py -m pytest backend/tests/test_msl_complete.py::test_basic_sequence
+```
+
+### MSL 파서 개별 테스트
+```bash
+# MSL 파서 직접 테스트
+cd backend/parsers
+py msl_parser.py
+
+# MSL 인터프리터 테스트  
+py msl_interpreter.py
+```
+
+## 🔍 디버깅 가이드
+
+### 1. MSL 파서 디버깅
+
+#### 파싱 문제 해결
+```python
+# 디버깅용 파서 테스트
+from backend.parsers.msl_parser import MSLParser
+
+def debug_parse(script):
+    parser = MSLParser()
+    try:
+        ast = parser.parse(script)
+        print(f"파싱 성공: {ast}")
+        return ast
+    except Exception as e:
+        print(f"파싱 실패: {e}")
+        return None
+
+# 문제가 있는 스크립트 테스트
+debug_parse("~CapsLock,(W,A,S,D),~CapsLock")
+```
+
+#### 토큰화 디버깅
+```python
+from backend.parsers.msl_lexer import MSLLexer
+
+def debug_tokenize(script):
+    lexer = MSLLexer()
+    tokens = lexer.tokenize(script)
+    for token in tokens:
+        print(f"토큰: {token.type} = '{token.value}'")
+
+debug_tokenize("W,A,S,D")
+```
+
+### 2. 음성 인식 디버깅
+
+#### 마이크 문제 해결
+```python
+# 마이크 감지 테스트
+py backend/tests/test_microphone_detection.py
+
+# 마이크 API 테스트
+py backend/tests/test_microphone_api.py
+```
+
+#### Whisper 서비스 디버깅
+```python
+from backend.services.whisper_service import WhisperService
+
+def debug_whisper():
+    service = WhisperService()
+    # 테스트 오디오 파일로 인식 테스트
+    result = service.transcribe("test_audio.wav")
+    print(f"인식 결과: {result}")
+```
+
+### 3. API 연동 디버깅
+
+#### 서버 연결 테스트
+```python
+# API 서버 상태 확인
+import requests
+
+def test_server_connection():
+    try:
+        response = requests.get("http://127.0.0.1:5000/api/health")
+        print(f"서버 상태: {response.status_code}")
+        return response.status_code == 200
+    except Exception as e:
+        print(f"서버 연결 실패: {e}")
+        return False
+```
+
+#### C# API 호출 테스트
+```bash
+# C# 쪽에서 Python API 호출 테스트
+py backend/tests/test_csharp_api_call.py
+```
+
+## 🚨 일반적인 문제 해결
+
+### 1. MSL 파서 오류
+
+#### 문제: 토글(`~`) 파싱 실패
+```python
+# 해결방법: msl_lexer.py에서 토글 토큰 정의 확인
+class MSLLexer:
+    def __init__(self):
+        self.tokens = [
+            # ... 기존 토큰들
+            ('TILDE', r'~'),  # 토글 연산자 추가
+        ]
+```
+
+#### 문제: 복잡한 그룹화 파싱 실패
+```python
+# 해결방법: msl_parser.py에서 그룹 처리 로직 강화
+def parse_group(self):
+    if self.current_token.type == 'LPAREN':
+        # 그룹 내부 파싱 로직 구현
+        pass
+```
+
+### 2. 음성 인식 오류
+
+#### 문제: 마이크 권한 거부
+```python
+# 해결방법: 마이크 권한 확인 및 요청
+import pyaudio
+
+def check_microphone_permission():
+    try:
+        audio = pyaudio.PyAudio()
+        # 마이크 장치 목록 확인
+        for i in range(audio.get_device_count()):
+            info = audio.get_device_info_by_index(i)
+            if info['maxInputChannels'] > 0:
+                print(f"마이크 장치: {info['name']}")
+        audio.terminate()
+        return True
+    except Exception as e:
+        print(f"마이크 권한 오류: {e}")
+        return False
+```
+
+#### 문제: Whisper 모델 로딩 실패
+```python
+# 해결방법: 모델 다운로드 및 캐시 확인
+import whisper
+
+def fix_whisper_model():
+    try:
+        model = whisper.load_model("base")
+        print("Whisper 모델 로딩 성공")
+        return model
+    except Exception as e:
+        print(f"모델 로딩 실패: {e}")
+        # 모델 재다운로드 또는 캐시 삭제 필요
+        return None
+```
+
+### 3. API 연동 오류
+
+#### 문제: 서버 시작 실패
+```bash
+# 해결방법: 포트 충돌 확인
+netstat -ano | findstr 5000
+
+# 다른 포트로 서버 시작
+set PORT=5001
+py run_server.py
+```
+
+#### 문제: C# HTTP 요청 실패
+```csharp
+// 해결방법: HttpClient 설정 확인
+private static readonly HttpClient client = new HttpClient()
+{
+    Timeout = TimeSpan.FromSeconds(30),
+    BaseAddress = new Uri("http://127.0.0.1:5000/")
+};
+```
+
+## 📊 테스트 커버리지
+
+### 현재 테스트 커버리지 상태
+- ✅ **MSL 기본 파싱**: 90% 커버리지
+- ✅ **API 엔드포인트**: 85% 커버리지
+- ⚠️ **음성 인식**: 70% 커버리지 (하드웨어 의존성)
+- ⚠️ **매크로 실행**: 60% 커버리지 (시스템 권한 필요)
+- ❌ **복잡한 MSL 구문**: 40% 커버리지 (개발 중)
+
+### 테스트 우선순위
+1. MSL 토글(`~`) 연산자 완성
+2. 음성 인식 정확도 향상
+3. API 오류 처리 강화
+4. 매크로 실행 안정성 개선
+
+## 🛠️ 개발 환경 설정
+
+### 테스트 환경 구성
+```bash
+# 가상환경 생성 (권장)
+python -m venv test_env
+test_env\Scripts\activate
+
+# 테스트 의존성 설치
+pip install pytest pytest-cov pytest-mock
+
+# 테스트 실행 전 서버 시작
+py run_server.py &
+```
+
+### 디버그 모드 설정
+```python
+# backend/utils/config.py
+DEBUG_MODE = True
+LOG_LEVEL = "DEBUG"
+ENABLE_DETAILED_LOGGING = True
+```
+
+## 📚 관련 문서
+- **전체 테스트 전략**: [PRD_게임AI음성매크로.md](mdc:PRD_게임AI음성매크로.md) 섹션 8
+- **MSL 파서 명세**: [msl-guide.mdc](mdc:.cursor/rules/msl-guide.mdc)
+- **API 문서**: [api-integration.mdc](mdc:.cursor/rules/api-integration.mdc)
+

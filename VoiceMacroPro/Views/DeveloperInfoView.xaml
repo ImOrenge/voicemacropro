@@ -1,0 +1,205 @@
+<UserControl x:Class="VoiceMacroPro.Views.DeveloperInfoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="800" d:DesignWidth="1200">
+    
+    <Grid Background="#F7FAFC">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header Area -->
+        <Border Grid.Row="0" Background="#2D3748" Padding="20" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="💻" FontSize="28" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Developer Info" FontSize="24" FontWeight="Bold" 
+                              Foreground="White" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="View License" Background="#4299E1" Foreground="White" 
+                           Padding="15,8" BorderThickness="0" FontWeight="Bold"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1" Margin="20,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- App Info Area -->
+            <Border Grid.Column="0" Background="White" CornerRadius="10" 
+                   Padding="20" BorderBrush="#E2E8F0" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Application Information" FontSize="18" 
+                              FontWeight="Bold" Foreground="#2D3748" Margin="0,0,0,20"/>
+                    
+                    <!-- App Icon and Name -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <TextBlock Text="🎮" FontSize="48" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="VoiceMacro Pro" FontSize="20" FontWeight="Bold" Foreground="#2D3748"/>
+                            <TextBlock Text="Game AI Voice Macro" FontSize="14" Foreground="#718096"/>
+                        </StackPanel>
+                    </StackPanel>
+                    
+                    <!-- Version Info -->
+                    <Grid Margin="0,10,0,20">
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Version:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="1.0.0" 
+                                  HorizontalAlignment="Right" Margin="0,5"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Build:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="2025.01.18.001" 
+                                  HorizontalAlignment="Right" Margin="0,5"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Platform:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text=".NET 8.0 / WPF" 
+                                  HorizontalAlignment="Right" Margin="0,5"/>
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="OS:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Windows 10/11" 
+                                  HorizontalAlignment="Right" Margin="0,5"/>
+                        
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Release Date:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" Text="January 18, 2025" 
+                                  HorizontalAlignment="Right" Margin="0,5"/>
+                    </Grid>
+                    
+                    <!-- Feature List -->
+                    <TextBlock Text="Key Features" FontWeight="Bold" Margin="0,10,0,10"/>
+                    <StackPanel>
+                        <TextBlock Text="• Whisper AI-based voice recognition" FontSize="12" Margin="0,2" Foreground="#2D3748"/>
+                        <TextBlock Text="• MSL (Macro Scripting Language) support" FontSize="12" Margin="0,2" Foreground="#2D3748"/>
+                        <TextBlock Text="• Real-time macro execution" FontSize="12" Margin="0,2" Foreground="#2D3748"/>
+                        <TextBlock Text="• Preset management system" FontSize="12" Margin="0,2" Foreground="#2D3748"/>
+                        <TextBlock Text="• Detailed log monitoring" FontSize="12" Margin="0,2" Foreground="#2D3748"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            
+            <!-- Developer and Contact Info Area -->
+            <Border Grid.Column="2" Background="White" CornerRadius="10" 
+                   Padding="20" BorderBrush="#E2E8F0" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Developer Information" FontSize="18" 
+                              FontWeight="Bold" Foreground="#2D3748" Margin="0,0,0,20"/>
+                    
+                    <!-- Developer Info -->
+                    <StackPanel HorizontalAlignment="Center" Margin="0,0,0,20">
+                        <TextBlock Text="💻" FontSize="36" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBlock Text="VoiceMacro Pro Team" FontSize="16" FontWeight="Bold" 
+                                  HorizontalAlignment="Center" Foreground="#2D3748"/>
+                        <TextBlock Text="Game Automation Solution Experts" FontSize="12" 
+                                  HorizontalAlignment="Center" Foreground="#718096"/>
+                    </StackPanel>
+                    
+                    <!-- Contact Info -->
+                    <TextBlock Text="Contact Information" FontWeight="Bold" Margin="0,10,0,10"/>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Email:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="support@voicemacro.pro" 
+                                  HorizontalAlignment="Right" Margin="0,5" Foreground="#4299E1"/>
+                        
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Website:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="www.voicemacro.pro" 
+                                  HorizontalAlignment="Right" Margin="0,5" Foreground="#4299E1"/>
+                        
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="GitHub:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="github.com/voicemacropro" 
+                                  HorizontalAlignment="Right" Margin="0,5" Foreground="#4299E1"/>
+                        
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Discord:" 
+                                  FontWeight="Bold" Margin="0,5"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="discord.gg/voicemacro" 
+                                  HorizontalAlignment="Right" Margin="0,5" Foreground="#4299E1"/>
+                    </Grid>
+                    
+                    <!-- License Info -->
+                    <TextBlock Text="License" FontWeight="Bold" Margin="0,20,0,10"/>
+                    <Border Background="#F0FFF4" BorderBrush="#38A169" BorderThickness="1" 
+                           CornerRadius="5" Padding="15">
+                        <StackPanel>
+                            <TextBlock Text="MIT License" FontWeight="Bold" Foreground="#38A169"/>
+                            <TextBlock Text="This is an open source project." FontSize="12" Foreground="#38A169" Margin="0,5,0,0"/>
+                            <TextBlock Text="Feel free to use and modify." FontSize="12" Foreground="#38A169"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Acknowledgments -->
+                    <TextBlock Text="Acknowledgments" FontWeight="Bold" Margin="0,20,0,10"/>
+                    <TextBlock Text="This project uses the following open source libraries:" 
+                              FontSize="12" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                    <StackPanel>
+                        <TextBlock Text="• OpenAI Whisper (voice recognition)" FontSize="11" Margin="0,2"/>
+                        <TextBlock Text="• NAudio (audio processing)" FontSize="11" Margin="0,2"/>
+                        <TextBlock Text="• Newtonsoft.Json (JSON processing)" FontSize="11" Margin="0,2"/>
+                        <TextBlock Text="• SQLite (database)" FontSize="11" Margin="0,2"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+        
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="#EDF2F7" Padding="15,10" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="VoiceMacro Pro - Game AI Voice Macro Solution" 
+                          FontSize="12" Foreground="#718096" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="© 2025 VoiceMacro Pro Team" 
+                          FontSize="12" FontWeight="Bold" Foreground="#2D3748" 
+                          VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

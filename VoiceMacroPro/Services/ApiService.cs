@@ -18,6 +18,34 @@ namespace VoiceMacroPro.Services
     /// </summary>
     public class ApiService
     {
+        #region Singleton Pattern
+        
+        private static ApiService? _instance;
+        private static readonly object _lock = new object();
+        
+        /// <summary>
+        /// ApiService의 싱글톤 인스턴스
+        /// </summary>
+        public static ApiService Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    lock (_lock)
+                    {
+                        if (_instance == null)
+                        {
+                            _instance = new ApiService();
+                        }
+                    }
+                }
+                return _instance;
+            }
+        }
+        
+        #endregion
+        
         private readonly HttpClient _httpClient;
         private readonly string _baseUrl;
 
@@ -96,17 +124,27 @@ namespace VoiceMacroPro.Services
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    return null; // 매크로를 찾지 못함
+                    return null;
                 }
                 else
                 {
-                    throw new Exception($"API 요청 실패: {response.StatusCode} - {content}");
+                    throw new Exception($"매크로 조회 실패: {response.StatusCode} - {content}");
                 }
             }
             catch (Exception ex)
             {
                 throw new Exception($"매크로 조회 중 오류 발생: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// ID로 매크로를 조회하는 함수 (GetMacroAsync의 별칭)
+        /// </summary>
+        /// <param name="macroId">조회할 매크로 ID</param>
+        /// <returns>매크로 객체 (없으면 null)</returns>
+        public async Task<Macro?> GetMacroByIdAsync(int macroId)
+        {
+            return await GetMacroAsync(macroId);
         }
 
         /// <summary>
@@ -680,14 +718,25 @@ namespace VoiceMacroPro.Services
         }
 
         /// <summary>
-        /// 새로운 프리셋을 생성하는 함수
+        /// 새로운 프리셋을 생성하는 함수 (간단한 매개변수 버전)
         /// </summary>
-        /// <param name="request">프리셋 생성 요청 데이터</param>
-        /// <returns>생성된 프리셋의 ID</returns>
-        public async Task<int> CreatePresetAsync(CreatePresetRequest request)
+        /// <param name="name">프리셋 이름</param>
+        /// <param name="description">프리셋 설명</param>
+        /// <param name="macroIds">포함할 매크로 ID 목록</param>
+        /// <param name="isFavorite">즐겨찾기 여부</param>
+        /// <returns>생성된 프리셋 객체</returns>
+        public async Task<PresetModel> CreatePresetAsync(string name, string description, List<int> macroIds, bool isFavorite = false)
         {
             try
             {
+                var request = new CreatePresetRequest
+                {
+                    Name = name,
+                    Description = description,
+                    MacroIds = macroIds,
+                    IsFavorite = isFavorite
+                };
+
                 var url = $"{_baseUrl}/api/presets";
                 var jsonContent = JsonConvert.SerializeObject(request);
                 var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
@@ -696,8 +745,8 @@ namespace VoiceMacroPro.Services
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
-                    return (int)apiResponse?.Data?.id;
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<PresetModel>>(content);
+                    return apiResponse?.Data ?? throw new Exception("프리셋 생성 결과가 null입니다.");
                 }
                 else
                 {
@@ -711,21 +760,41 @@ namespace VoiceMacroPro.Services
         }
 
         /// <summary>
-        /// 기존 프리셋을 수정하는 함수
+        /// 기존 프리셋을 수정하는 함수 (간단한 매개변수 버전)
         /// </summary>
         /// <param name="presetId">수정할 프리셋 ID</param>
-        /// <param name="request">프리셋 수정 요청 데이터</param>
-        /// <returns>수정 성공 여부</returns>
-        public async Task<bool> UpdatePresetAsync(int presetId, UpdatePresetRequest request)
+        /// <param name="name">새로운 이름</param>
+        /// <param name="description">새로운 설명</param>
+        /// <param name="macroIds">새로운 매크로 ID 목록</param>
+        /// <param name="isFavorite">즐겨찾기 여부</param>
+        /// <returns>수정된 프리셋 객체</returns>
+        public async Task<PresetModel> UpdatePresetAsync(int presetId, string? name = null, string? description = null, List<int>? macroIds = null, bool? isFavorite = null)
         {
             try
             {
+                var request = new UpdatePresetRequest
+                {
+                    Name = name,
+                    Description = description,
+                    MacroIds = macroIds,
+                    IsFavorite = isFavorite
+                };
+
                 var url = $"{_baseUrl}/api/presets/{presetId}";
                 var jsonContent = JsonConvert.SerializeObject(request);
                 var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PutAsync(url, httpContent);
+                var content = await response.Content.ReadAsStringAsync();
 
-                return response.IsSuccessStatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<PresetModel>>(content);
+                    return apiResponse?.Data ?? throw new Exception("프리셋 수정 결과가 null입니다.");
+                }
+                else
+                {
+                    throw new Exception($"프리셋 수정 실패: {response.StatusCode} - {content}");
+                }
             }
             catch (Exception ex)
             {
@@ -734,12 +803,12 @@ namespace VoiceMacroPro.Services
         }
 
         /// <summary>
-        /// 프리셋을 복사하는 함수
+        /// 프리셋을 복사하는 함수 (PresetModel 반환 버전)
         /// </summary>
         /// <param name="presetId">복사할 프리셋 ID</param>
         /// <param name="newName">새로운 프리셋 이름 (선택사항)</param>
-        /// <returns>복사된 프리셋의 ID</returns>
-        public async Task<int> CopyPresetAsync(int presetId, string? newName = null)
+        /// <returns>복사된 프리셋 객체</returns>
+        public async Task<PresetModel> CopyPresetAsync(int presetId, string? newName = null)
         {
             try
             {
@@ -752,8 +821,8 @@ namespace VoiceMacroPro.Services
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
-                    return (int)apiResponse?.Data?.id;
+                    var apiResponse = JsonConvert.DeserializeObject<ApiResponse<PresetModel>>(content);
+                    return apiResponse?.Data ?? throw new Exception("프리셋 복사 결과가 null입니다.");
                 }
                 else
                 {
@@ -951,9 +1020,9 @@ namespace VoiceMacroPro.Services
 
         /// <summary>
         /// 서버 상태를 확인하는 함수
-        /// 애플리케이션 시작 시 백엔드 서버가 실행 중인지 확인합니다.
+        /// 백엔드 API 서버가 정상적으로 동작하는지 테스트합니다.
         /// </summary>
-        /// <returns>서버 연결 상태</returns>
+        /// <returns>서버 연결 상태 (true: 정상, false: 오류)</returns>
         public async Task<bool> CheckServerHealthAsync()
         {
             try
@@ -962,10 +1031,20 @@ namespace VoiceMacroPro.Services
                 var response = await _httpClient.GetAsync(url);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception)
             {
-                return false; // 서버에 연결할 수 없음
+                return false;
             }
+        }
+
+        /// <summary>
+        /// 서버 연결을 테스트하는 함수 (MainWindow에서 사용)
+        /// CheckServerHealthAsync와 동일한 기능을 제공합니다.
+        /// </summary>
+        /// <returns>서버 연결 상태 (true: 정상, false: 오류)</returns>
+        public async Task<bool> TestConnectionAsync()
+        {
+            return await CheckServerHealthAsync();
         }
 
         /// <summary>

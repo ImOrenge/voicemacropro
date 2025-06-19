@@ -1,0 +1,196 @@
+<UserControl x:Class="VoiceMacroPro.Views.PresetManagementView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="800" d:DesignWidth="1200">
+    
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
+    
+    <Grid Background="#F7FAFC">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 타이틀 부분 -->
+        <Border Grid.Row="0" Background="#805AD5" Padding="20" Margin="0,0,0,10">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="📁" FontSize="28" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="프리셋 관리" FontSize="24" FontWeight="Bold" 
+                              Foreground="White" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="NewPresetButton" Content="새 프리셋" Background="#48BB78" Foreground="White" 
+                           Padding="15,8" BorderThickness="0" FontWeight="Bold" 
+                           Margin="0,0,10,0" Click="NewPresetButton_Click"/>
+                    <Button x:Name="ImportPresetButton" Content="가져오기" Background="#38B2AC" Foreground="White" 
+                           Padding="15,8" BorderThickness="0" FontWeight="Bold" Click="ImportPresetButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- 로딩 인디케이터 -->
+        <Border Grid.Row="1" Background="White" Opacity="0.8" Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}" Panel.ZIndex="1000">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="10" Margin="0,0,0,10"/>
+                <TextBlock Text="프리셋 데이터를 로드하는 중..." FontSize="14" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 프리셋 목록 부분 -->
+        <Grid Grid.Row="1" Margin="20,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- 프리셋 목록 부분 -->
+            <Border Grid.Column="0" Background="White" CornerRadius="10" 
+                   Padding="15" BorderBrush="#E2E8F0" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Grid.Row="0" Text="프리셋 목록" FontSize="18" 
+                              FontWeight="Bold" Foreground="#2D3748" Margin="0,0,0,15"/>
+                    
+                    <DataGrid x:Name="PresetDataGrid" Grid.Row="1"
+                             ItemsSource="{Binding Presets}"
+                             SelectedItem="{Binding SelectedPreset, Mode=TwoWay}"
+                             SelectionChanged="PresetDataGrid_SelectionChanged"
+                             AutoGenerateColumns="False" CanUserAddRows="False" 
+                             CanUserDeleteRows="False" SelectionMode="Single"
+                             GridLinesVisibility="None" HeadersVisibility="Column"
+                             Background="White" RowBackground="#F7FAFC"
+                             AlternatingRowBackground="#EDF2F7">
+                        
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="프리셋명" Binding="{Binding Name}" 
+                                               Width="*" MinWidth="120"/>
+                            <DataGridTextColumn Header="설명" Binding="{Binding Description}" 
+                                               Width="2*" MinWidth="150"/>
+                            <DataGridTextColumn Header="매크로 수" Binding="{Binding MacroCount}" 
+                                               Width="80" MinWidth="60"/>
+                            <DataGridCheckBoxColumn Header="즐겨찾기" Binding="{Binding IsFavorite}" 
+                                                   Width="70" MinWidth="60"/>
+                            <DataGridTextColumn Header="생성일" Binding="{Binding CreatedAt, StringFormat=yyyy-MM-dd}" 
+                                               Width="100" MinWidth="80"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+            
+            <!-- 프리셋 세부 정보 부분 -->
+            <Border Grid.Column="2" Background="White" CornerRadius="10" 
+                   Padding="15" BorderBrush="#E2E8F0" BorderThickness="1">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="프리셋 세부 정보" FontSize="18" 
+                                  FontWeight="Bold" Foreground="#2D3748" Margin="0,0,0,15"/>
+                        
+                        <!-- 프리셋 기본 정보 -->
+                        <TextBlock Text="프리셋명" FontWeight="Bold" Margin="0,10,0,5"/>
+                        <TextBox x:Name="PresetNameTextBox" Padding="8" BorderBrush="#CBD5E0"/>
+                        
+                        <TextBlock Text="설명" FontWeight="Bold" Margin="0,15,0,5"/>
+                        <TextBox x:Name="PresetDescriptionTextBox" Padding="8" BorderBrush="#CBD5E0" 
+                                TextWrapping="Wrap" Height="60"/>
+                        
+                        <!-- 프리셋 상태 정보 -->
+                        <TextBlock Text="프리셋 정보" FontWeight="Bold" Margin="0,20,0,10"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="매크로 수:" Margin="0,3"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedPreset.MacroCount}" 
+                                     HorizontalAlignment="Right" Margin="0,3" FontWeight="Bold"/>
+                            
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="생성일:" Margin="0,3"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedPreset.CreatedAt, StringFormat=yyyy-MM-dd HH:mm}" 
+                                     HorizontalAlignment="Right" Margin="0,3"/>
+                            
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="수정일:" Margin="0,3"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedPreset.UpdatedAt, StringFormat=yyyy-MM-dd HH:mm}" 
+                                     HorizontalAlignment="Right" Margin="0,3"/>
+                            
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="즐겨찾기:" Margin="0,3"/>
+                            <CheckBox Grid.Row="3" Grid.Column="1" x:Name="FavoriteCheckBox" 
+                                     HorizontalAlignment="Right" Margin="0,3"/>
+                        </Grid>
+                        
+                        <!-- 기본 버튼 -->
+                        <UniformGrid Columns="2" Margin="0,20,0,0">
+                            <Button x:Name="EditPresetButton" Content="수정" 
+                                   Background="#4299E1" Foreground="White" Padding="10,8" 
+                                   BorderThickness="0" Margin="0,0,5,0" Click="EditPresetButton_Click"/>
+                            <Button x:Name="CopyPresetButton" Content="복사" 
+                                   Background="#38B2AC" Foreground="White" Padding="10,8" 
+                                   BorderThickness="0" Margin="5,0,0,0" Click="CopyPresetButton_Click"/>
+                        </UniformGrid>
+                        
+                        <UniformGrid Columns="2" Margin="0,10,0,0">
+                            <Button x:Name="DeletePresetButton" Content="삭제" 
+                                   Background="#E53E3E" Foreground="White" Padding="10,8" 
+                                   BorderThickness="0" Margin="0,0,5,0" Click="DeletePresetButton_Click"/>
+                            <Button x:Name="ExportPresetButton" Content="내보내기" 
+                                   Background="#805AD5" Foreground="White" Padding="10,8" 
+                                   BorderThickness="0" Margin="5,0,0,0" Click="ExportPresetButton_Click"/>
+                        </UniformGrid>
+                        
+                        <!-- 프리셋 매크로 목록 -->
+                        <TextBlock Text="프리셋에 속한 매크로" FontWeight="Bold" Margin="0,20,0,10"/>
+                        <ListBox x:Name="PresetMacroListBox" Height="120" 
+                                Background="#F7FAFC" BorderBrush="#CBD5E0" BorderThickness="1">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" Padding="5" FontSize="12"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        
+        <!-- 상태 정보 부분 -->
+        <Border Grid.Row="2" Background="#EDF2F7" Padding="15,10" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" 
+                          FontSize="12" Foreground="#718096" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Presets.Count, StringFormat=전체 프리셋: {0}개}" 
+                          FontSize="12" FontWeight="Bold" Foreground="#805AD5" 
+                          VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
