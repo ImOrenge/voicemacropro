@@ -233,7 +233,7 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
     
     Args:
         client_id (str): 클라이언트 세션 ID
-        audio_bytes (bytes): 디코딩된 오디오 데이터
+        audio_bytes (bytes): 디코딩된 PCM 오디오 데이터
     """
     def run_transcription():
         try:
@@ -243,12 +243,30 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
             # temp_audio 디렉토리가 없으면 생성
             os.makedirs("temp_audio", exist_ok=True)
             
-            # 오디오 바이트를 WAV 파일로 저장 (임시)
-            with open(temp_audio_path, 'wb') as f:
-                f.write(audio_bytes)
+            # PCM 데이터를 WAV 파일로 변환하여 저장
+            import wave
             
-            # Whisper를 사용한 음성인식 (향후 GPT-4o로 교체 예정)
             try:
+                # NAudio에서 전송된 PCM 데이터 (24kHz, 16-bit, mono)
+                sample_rate = 24000
+                channels = 1
+                sample_width = 2  # 16-bit = 2 bytes
+                
+                # WAV 파일 헤더와 함께 저장
+                with wave.open(temp_audio_path, 'wb') as wav_file:
+                    wav_file.setnchannels(channels)
+                    wav_file.setsampwidth(sample_width)
+                    wav_file.setframerate(sample_rate)
+                    wav_file.writeframes(audio_bytes)
+                
+                print(f"🎵 오디오 파일 저장 완료: {temp_audio_path} ({len(audio_bytes)} bytes)")
+                
+                # 오디오 파일 크기 체크 (최소 크기 확인)
+                if len(audio_bytes) < 1024:  # 1KB 미만이면 처리하지 않음
+                    print(f"⚠️ 오디오 데이터가 너무 작음: {len(audio_bytes)} bytes")
+                    return
+                
+                # Whisper를 사용한 음성인식 (향후 GPT-4o로 교체 예정)
                 transcription_result = whisper_service.transcribe_audio(temp_audio_path)
                 
                 if transcription_result and transcription_result.get('success'):
@@ -273,11 +291,15 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                         
                         # 매크로 매칭 시도
                         try_macro_matching(client_id, text, confidence)
+                    else:
+                        print("🔇 음성인식 결과가 비어있음")
+                else:
+                    print(f"❌ 음성인식 실패: {transcription_result}")
                 
-            except Exception as transcription_error:
-                print(f"❌ 음성인식 처리 오류: {transcription_error}")
+            except Exception as audio_processing_error:
+                print(f"❌ 오디오 파일 처리 오류: {audio_processing_error}")
                 socketio.emit('transcription_error', {
-                    'error': str(transcription_error),
+                    'error': f'오디오 파일 처리 실패: {str(audio_processing_error)}',
                     'timestamp': datetime.now().isoformat()
                 }, room=client_id)
             
@@ -285,9 +307,14 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                 # 임시 파일 삭제
                 if os.path.exists(temp_audio_path):
                     os.remove(temp_audio_path)
+                    print(f"🗑️ 임시 파일 삭제: {temp_audio_path}")
         
         except Exception as e:
             print(f"❌ 트랜스크립션 처리 오류: {e}")
+            socketio.emit('transcription_error', {
+                'error': str(e),
+                'timestamp': datetime.now().isoformat()
+            }, room=client_id)
     
     # 백그라운드 스레드에서 실행
     threading.Thread(target=run_transcription, daemon=True).start()

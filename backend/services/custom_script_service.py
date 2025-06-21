@@ -718,8 +718,21 @@ class CustomScriptService:
                 logger.info(f"기본 스크립트 실행 시작: {script_code}")
                 
                 # 안전 설정
-                pyautogui.FAILSAFE = True
-                pyautogui.PAUSE = 0.1
+                pyautogui.FAILSAFE = False  # 테스트를 위해 일시적으로 비활성화
+                pyautogui.PAUSE = 0.05  # 빠른 실행을 위해 단축
+                
+                # 스크린 크기 확인 (Windows 호환성)
+                try:
+                    screen_width, screen_height = pyautogui.size()
+                    logger.info(f"🖥️ 스크린 크기: {screen_width}x{screen_height}")
+                    
+                    # 간단한 테스트 - 마우스 위치 확인
+                    mouse_x, mouse_y = pyautogui.position()
+                    logger.info(f"🖱️ 현재 마우스 위치: ({mouse_x}, {mouse_y})")
+                    
+                except Exception as screen_error:
+                    logger.warning(f"화면 정보 확인 실패: {screen_error}")
+                    # 실패해도 계속 진행
                 
                 # 간단한 MSL 명령 파싱
                 commands = script_code.split(',')
@@ -735,40 +748,72 @@ class CustomScriptService:
                         if command.startswith('(') and command.endswith(')'):
                             delay_ms = int(command[1:-1])
                             time.sleep(delay_ms / 1000.0)
+                            logger.info(f"⏰ 지연 실행: {delay_ms}ms")
                             executed_commands.append(f"대기 {delay_ms}ms")
                             continue
                         
                         # 홀드 처리 - Key[숫자] 형태  
                         if '[' in command and command.endswith(']'):
                             parts = command.split('[')
-                            key = parts[0].strip()
+                            key = parts[0].strip().lower()
                             hold_time = int(parts[1][:-1])
                             
-                            logger.info(f"키 홀드 시뮬레이션: {key} for {hold_time}ms")
-                            executed_commands.append(f"{key} 홀드 {hold_time}ms")
+                            # 실제 키 홀드 실행 (오류 처리 포함)
+                            try:
+                                pyautogui.keyDown(key)
+                                time.sleep(hold_time / 1000.0)
+                                pyautogui.keyUp(key)
+                                logger.info(f"🔽 키 홀드 실행 성공: {key} for {hold_time}ms")
+                                executed_commands.append(f"{key} 홀드 {hold_time}ms")
+                            except Exception as hold_error:
+                                logger.error(f"❌ 키 홀드 실행 실패: {key} - {hold_error}")
+                                executed_commands.append(f"키 홀드 실패: {key}")
                             continue
                         
                         # 반복 처리 - Key*숫자 형태
                         if '*' in command:
                             parts = command.split('*')
-                            key = parts[0].strip()
+                            key = parts[0].strip().lower()
                             repeat_count = int(parts[1])
                             
-                            logger.info(f"키 반복 시뮬레이션: {key} x {repeat_count}")
-                            executed_commands.append(f"{key} {repeat_count}회 반복")
+                            # 실제 키 반복 실행 (오류 처리 포함)
+                            try:
+                                for i in range(repeat_count):
+                                    pyautogui.press(key)
+                                    time.sleep(0.05)  # 50ms 간격
+                                logger.info(f"🔄 키 반복 실행 성공: {key} x {repeat_count}")
+                                executed_commands.append(f"{key} {repeat_count}회 반복")
+                            except Exception as repeat_error:
+                                logger.error(f"❌ 키 반복 실행 실패: {key} - {repeat_error}")
+                                executed_commands.append(f"키 반복 실패: {key}")
                             continue
                         
                         # 조합키 처리 - Key+Key 형태
                         if '+' in command:
-                            keys = [k.strip() for k in command.split('+')]
-                            logger.info(f"조합키 시뮬레이션: {' + '.join(keys)}")
-                            executed_commands.append(f"조합키: {' + '.join(keys)}")
+                            keys = [k.strip().lower() for k in command.split('+')]
+                            
+                            # 실제 조합키 실행 (오류 처리 포함)
+                            try:
+                                pyautogui.hotkey(*keys)
+                                logger.info(f"⌨️ 조합키 실행 성공: {' + '.join(keys)}")
+                                executed_commands.append(f"조합키: {' + '.join(keys)}")
+                            except Exception as hotkey_error:
+                                logger.error(f"❌ 조합키 실행 실패: {' + '.join(keys)} - {hotkey_error}")
+                                executed_commands.append(f"조합키 실패: {' + '.join(keys)}")
                             continue
                         
                         # 단순 키 입력
-                        if command.isalpha() or command.lower() in ['space', 'enter', 'tab', 'shift', 'ctrl', 'alt']:
-                            logger.info(f"키 시뮬레이션: {command}")
-                            executed_commands.append(f"키 입력: {command}")
+                        if command.isalpha() or command.lower() in ['space', 'enter', 'tab', 'shift', 'ctrl', 'alt', 'esc', 'backspace', 'delete']:
+                            key = command.lower()
+                            
+                            # 실제 키 입력 실행 (오류 처리 포함)
+                            try:
+                                pyautogui.press(key)
+                                logger.info(f"⌨️ 키 입력 실행 성공: {key}")
+                                executed_commands.append(f"키 입력: {key}")
+                            except Exception as key_error:
+                                logger.error(f"❌ 키 입력 실행 실패: {key} - {key_error}")
+                                executed_commands.append(f"키 입력 실패: {key}")
                             continue
                         
                         # 처리되지 않은 명령
@@ -779,7 +824,7 @@ class CustomScriptService:
                         logger.warning(f"명령 실행 실패: {command} - {cmd_error}")
                         executed_commands.append(f"실패: {command}")
                 
-                result_message = f"기본 스크립트 실행 완료: {', '.join(executed_commands)}"
+                result_message = f"✅ 실제 키 입력 실행 완료: {', '.join(executed_commands)}"
                 logger.info(result_message)
                 return result_message
                 

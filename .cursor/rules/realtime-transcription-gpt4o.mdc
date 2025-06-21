@@ -1,7 +1,7 @@
 ---
-description:
-globs:
-alwaysApply: false
+description: 
+globs: 
+alwaysApply: true
 ---
 # GPT-4o Real-time Transcription Implementation Guide
 
@@ -580,7 +580,7 @@ Add to [VoiceMacroPro/VoiceMacroPro.csproj](mdc:VoiceMacroPro/VoiceMacroPro.cspr
 ## Testing Strategy
 
 ### Unit Tests
-Create tests in [backend/tests/](mdc:backend/tests/) directory:
+Create tests in [backend/tests/](mdc:backend/tests) directory:
 - `test_gpt4o_transcription.py` - Test transcription service
 - `test_voice_service_integration.py` - Test voice service integration
 - `test_realtime_api_connection.py` - Test WebSocket connectivity
@@ -614,3 +614,4 @@ Create tests in [backend/tests/](mdc:backend/tests/) directory:
 - Implement usage analytics for optimization
 
 This implementation provides a robust, real-time voice recognition system using GPT-4o-transcribe while maintaining compatibility with the existing VoiceMacro Pro architecture.
+

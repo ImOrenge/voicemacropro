@@ -179,6 +179,40 @@ namespace VoiceMacroPro.Views
         /// 오디오 레벨을 백분율로 표시
         /// </summary>
         public string AudioLevelPercentage => $"{AudioLevel * 100:F1}%";
+
+        /// <summary>
+        /// 현재 사용 중인 마이크 장치 정보
+        /// </summary>
+        private string _currentMicrophoneDevice = "윈도우 기본 마이크";
+        public string CurrentMicrophoneDevice
+        {
+            get => _currentMicrophoneDevice;
+            set
+            {
+                _currentMicrophoneDevice = value;
+                OnPropertyChanged(nameof(CurrentMicrophoneDevice));
+            }
+        }
+
+        /// <summary>
+        /// 마이크 장치 새로고침 중 여부
+        /// </summary>
+        private bool _isRefreshingAudioDevice = false;
+        public bool IsRefreshingAudioDevice
+        {
+            get => _isRefreshingAudioDevice;
+            set
+            {
+                _isRefreshingAudioDevice = value;
+                OnPropertyChanged(nameof(IsRefreshingAudioDevice));
+                OnPropertyChanged(nameof(RefreshButtonText));
+            }
+        }
+
+        /// <summary>
+        /// 새로고침 버튼 텍스트
+        /// </summary>
+        public string RefreshButtonText => IsRefreshingAudioDevice ? "새로고침 중..." : "마이크 새로고침";
         #endregion
 
         #region 세션 통계
@@ -380,7 +414,7 @@ namespace VoiceMacroPro.Views
                 }
                 
                 // 성공적인 매크로 실행 시 사용자 알림
-                if (result.IsSuccessful)
+                if (result.IsExecuted)
                 {
                     _loggingService.LogInfo($"매크로 실행 성공: {result.MacroName}");
                 }
@@ -532,6 +566,99 @@ namespace VoiceMacroPro.Views
             {
                 _loggingService.LogError($"통계 새로고침 오류: {ex.Message}");
                 UIHelper.ShowError($"통계 새로고침 중 오류가 발생했습니다: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 마이크 장치 새로고침 버튼 클릭 이벤트 핸들러
+        /// 윈도우 기본 마이크 설정을 다시 감지하고 적용합니다.
+        /// </summary>
+        private async void RefreshAudioDeviceButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                IsRefreshingAudioDevice = true;
+                _loggingService.LogInfo("🔄 마이크 장치 새로고침 시작");
+
+                // 마이크 장치 새로고침 실행
+                bool success = await _voiceService.RefreshAudioDeviceAsync();
+                
+                if (success)
+                {
+                    CurrentMicrophoneDevice = "윈도우 기본 마이크 (새로고침됨)";
+                    _loggingService.LogInfo("✅ 마이크 장치 새로고침 완료");
+                    
+                    // 사용자에게 성공 메시지 표시
+                    UIHelper.ShowInfo("마이크 장치가 성공적으로 새로고침되었습니다.\n윈도우 기본 마이크를 사용합니다.");
+                }
+                else
+                {
+                    _loggingService.LogWarning("⚠️ 마이크 장치 새로고침 실패");
+                    UIHelper.ShowWarning("마이크 장치 새로고침에 실패했습니다.\n마이크가 올바르게 연결되어 있는지 확인하세요.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ 마이크 장치 새로고침 오류: {ex.Message}");
+                UIHelper.ShowError($"마이크 장치 새로고침 중 오류가 발생했습니다:\n{ex.Message}");
+            }
+            finally
+            {
+                IsRefreshingAudioDevice = false;
+            }
+        }
+
+        /// <summary>
+        /// 마이크 테스트 버튼 클릭 이벤트 핸들러
+        /// 현재 마이크 장치의 동작 상태를 테스트합니다.
+        /// </summary>
+        private async void TestMicrophoneButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _loggingService.LogInfo("🎤 마이크 테스트 시작");
+
+                if (!IsConnected)
+                {
+                    UIHelper.ShowWarning("먼저 GPT-4o 서비스에 연결해주세요.");
+                    return;
+                }
+
+                // 짧은 녹음 테스트 (3초)
+                UIHelper.ShowInfo("마이크 테스트를 시작합니다.\n3초간 말씀해 주세요.");
+                
+                bool testStarted = await _voiceService.StartRecordingAsync();
+                if (testStarted)
+                {
+                    IsRecording = true;
+                    
+                    // 3초 후 자동 중지
+                    await Task.Delay(3000);
+                    
+                    bool testStopped = await _voiceService.StopRecordingAsync();
+                    if (testStopped)
+                    {
+                        IsRecording = false;
+                        _loggingService.LogInfo("✅ 마이크 테스트 완료");
+                        UIHelper.ShowInfo("마이크 테스트가 완료되었습니다.\n트랜스크립션 결과를 확인하세요.");
+                    }
+                }
+                else
+                {
+                    UIHelper.ShowError("마이크 테스트를 시작할 수 없습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ 마이크 테스트 오류: {ex.Message}");
+                UIHelper.ShowError($"마이크 테스트 중 오류가 발생했습니다:\n{ex.Message}");
+                
+                // 오류 발생 시 녹음 상태 정리
+                if (IsRecording)
+                {
+                    await _voiceService.StopRecordingAsync();
+                    IsRecording = false;
+                }
             }
         }
 

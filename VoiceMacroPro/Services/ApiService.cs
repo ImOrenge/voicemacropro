@@ -1289,8 +1289,50 @@ namespace VoiceMacroPro.Services
             {
                 var url = $"{_baseUrl}/api/scripts/{scriptId}/execute";
                 var response = await _httpClient.PostAsync(url, new StringContent("", Encoding.UTF8, "application/json"));
+                var content = await response.Content.ReadAsStringAsync();
 
-                return response.IsSuccessStatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    // 성공적인 응답에서 추가 정보 로깅
+                    try
+                    {
+                        var apiResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
+                        if (apiResponse?.Data != null)
+                        {
+                            // 실행 결과 로깅 (디버깅용)
+                            System.Diagnostics.Debug.WriteLine($"스크립트 실행 성공: {JsonConvert.SerializeObject(apiResponse.Data)}");
+                        }
+                    }
+                    catch
+                    {
+                        // JSON 파싱 실패는 무시 (로깅용이므로)
+                    }
+                    return true;
+                }
+                else
+                {
+                    // 실패 응답에서 상세 오류 메시지 추출
+                    string errorMessage = "알 수 없는 오류";
+                    try
+                    {
+                        var errorResponse = JsonConvert.DeserializeObject<ApiResponse<dynamic>>(content);
+                        if (!string.IsNullOrEmpty(errorResponse?.Error))
+                        {
+                            errorMessage = errorResponse.Error;
+                        }
+                        else if (!string.IsNullOrEmpty(errorResponse?.Message))
+                        {
+                            errorMessage = errorResponse.Message;
+                        }
+                    }
+                    catch
+                    {
+                        // JSON 파싱 실패 시 원본 content 사용
+                        errorMessage = content.Length > 200 ? content.Substring(0, 200) + "..." : content;
+                    }
+                    
+                    throw new Exception($"스크립트 실행 실패 ({response.StatusCode}): {errorMessage}");
+                }
             }
             catch (Exception ex)
             {

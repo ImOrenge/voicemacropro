@@ -506,4 +506,43 @@ private async Task LoadMacros(bool showLoading = true)
 - [ ] 오류 처리 구현
 - [ ] 테스트 케이스 작성 (권장)
 
+### 앱 실행시 커맨드 준수 
+- python 실행시 커맨드는 "py example.py" 사용 do not "python example.py"
+- 애플리케이션 실행 및 테스트 시 우선 "cd voicemacropro" 커맨드로 디렉토리 선택후 "dotnet run" 커맨드 실행 
+- 모든 커맨드 실행시 "&&"기호 사용금지 각각의 커맨드를 분리해서 사용할것 
+
+### 🚨 Python 환경 불일치 문제 해결 가이드
+
+#### 문제 현상
+- `ModuleNotFoundError: No module named 'websockets'` 등의 패키지 임포트 오류
+- `pip install`로 설치했지만 Python에서 임포트 실패
+- 서버 실행 시 패키지 관련 경고 메시지
+
+#### 원인 분석
+Windows에서 여러 Python 환경이 설치된 경우:
+- Microsoft Store 버전 Python
+- 일반 설치 버전 Python
+- `pip` 명령어와 `py` 명령어가 다른 Python 환경을 사용
+
+#### 해결 방법
+```bash
+# 1. 현재 Python 환경 확인
+py -V
+py -c "import sys; print('Python 경로:', sys.executable)"
+
+# 2. pip 환경 확인  
+py -m pip --version
+
+# 3. 올바른 Python 환경에 패키지 설치
+py -m pip install -r requirements.txt
+
+# 4. 설치 확인
+py -c "import websockets; print('websockets 버전:', websockets.__version__)"
+```
+
+#### 재발 방지 규칙
+- **항상 `py -m pip install` 사용** (단독 `pip` 명령어 금지)
+- 새로운 패키지 설치 후 반드시 임포트 테스트 실행
+- 개발 환경 설정 시 Python 경로 통일성 확인
+
 이 규칙들을 준수하면 코드 품질과 유지보수성이 크게 향상되며, 팀 협업 시 일관성을 유지할 수 있습니다! 😊 
