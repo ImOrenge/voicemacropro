@@ -1,0 +1,616 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# GPT-4o Real-time Transcription Implementation Guide
+
+## Overview
+
+This rule provides comprehensive guidance for implementing OpenAI's GPT-4o-transcribe model for real-time voice recognition in VoiceMacro Pro, replacing the current Whisper-based system in [backend/services/whisper_service.py](mdc:backend/services/whisper_service.py) and enhancing [backend/services/voice_service.py](mdc:backend/services/voice_service.py).
+
+## Architecture Components
+
+### Backend Services (Python)
+- **Primary Service**: [backend/services/voice_service.py](mdc:backend/services/voice_service.py) - Main voice processing orchestrator
+- **Transcription Service**: [backend/services/whisper_service.py](mdc:backend/services/whisper_service.py) - Replace with GPT-4o service
+- **API Server**: [backend/api/server.py](mdc:backend/api/server.py) - WebSocket endpoint for real-time communication
+
+### Frontend Services (C# WPF)  
+- **Voice Wrapper**: [VoiceMacroPro/Services/VoiceRecognitionWrapperService.cs](mdc:VoiceMacroPro/Services/VoiceRecognitionWrapperService.cs) - C# interface for voice operations
+- **Voice Recognition View**: [VoiceMacroPro/Views/VoiceRecognitionView.xaml.cs](mdc:VoiceMacroPro/Views/VoiceRecognitionView.xaml.cs) - UI for voice controls
+
+## Implementation Steps
+
+### 1. Create GPT-4o Transcription Service
+
+Create `backend/services/gpt4o_transcription_service.py`:
+
+```python
+import asyncio
+import websockets
+import json
+import base64
+import logging
+from typing import Optional, Callable, Dict, Any
+from datetime import datetime
+
+class GPT4oTranscriptionService:
+    """
+    Real-time transcription service using OpenAI GPT-4o-transcribe model
+    """
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.websocket: Optional[websockets.WebSocketServerProtocol] = None
+        self.session_id: Optional[str] = None
+        self.is_connected = False
+        self.transcription_callback: Optional[Callable] = None
+        self.logger = logging.getLogger(__name__)
+        
+        # Session configuration
+        self.session_config = {
+            "type": "transcription_session.update",
+            "input_audio_format": "pcm16",
+            "input_audio_transcription": {
+                "model": "gpt-4o-transcribe",
+                "prompt": "Transcribe gaming commands and macro instructions accurately",
+                "language": "ko"  # Korean for VoiceMacro Pro
+            },
+            "turn_detection": {
+                "type": "server_vad",
+                "threshold": 0.5,
+                "prefix_padding_ms": 300,
+                "silence_duration_ms": 500
+            },
+            "input_audio_noise_reduction": {
+                "type": "near_field"
+            },
+            "include": [
+                "item.input_audio_transcription.logprobs"
+            ]
+        }
+    
+    async def connect(self) -> bool:
+        """
+        Establish WebSocket connection to OpenAI Realtime API
+        """
+        try:
+            uri = "wss://api.openai.com/v1/realtime"
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "OpenAI-Beta": "realtime=v1"
+            }
+            
+            self.websocket = await websockets.connect(uri, extra_headers=headers)
+            await self._initialize_session()
+            self.is_connected = True
+            self.logger.info("Successfully connected to GPT-4o transcription service")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to connect to GPT-4o service: {e}")
+            return False
+    
+    async def _initialize_session(self):
+        """
+        Initialize transcription session with configuration
+        """
+        await self.websocket.send(json.dumps(self.session_config))
+        
+        # Listen for session confirmation
+        response = await self.websocket.recv()
+        session_data = json.loads(response)
+        
+        if session_data.get("type") == "transcription_session.created":
+            self.session_id = session_data.get("id")
+            self.logger.info(f"Transcription session created: {self.session_id}")
+    
+    async def send_audio_chunk(self, audio_data: bytes):
+        """
+        Send audio data to transcription service
+        
+        Args:
+            audio_data: PCM16 audio bytes at 24kHz sample rate
+        """
+        if not self.is_connected or not self.websocket:
+            raise ConnectionError("Not connected to transcription service")
+        
+        # Encode audio data to base64
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        
+        message = {
+            "type": "input_audio_buffer.append",
+            "audio": audio_base64
+        }
+        
+        await self.websocket.send(json.dumps(message))
+    
+    async def commit_audio_buffer(self):
+        """
+        Manually commit audio buffer for transcription (when VAD is disabled)
+        """
+        message = {"type": "input_audio_buffer.commit"}
+        await self.websocket.send(json.dumps(message))
+    
+    async def listen_for_transcriptions(self):
+        """
+        Listen for transcription events and handle them
+        """
+        try:
+            async for message in self.websocket:
+                data = json.loads(message)
+                await self._handle_transcription_event(data)
+                
+        except websockets.exceptions.ConnectionClosed:
+            self.logger.warning("Transcription connection closed")
+            self.is_connected = False
+        except Exception as e:
+            self.logger.error(f"Error in transcription listener: {e}")
+    
+    async def _handle_transcription_event(self, event: Dict[str, Any]):
+        """
+        Handle different types of transcription events
+        
+        Args:
+            event: Event data from OpenAI Realtime API
+        """
+        event_type = event.get("type")
+        
+        if event_type == "conversation.item.input_audio_transcription.delta":
+            # Incremental transcription update
+            delta_text = event.get("delta", "")
+            item_id = event.get("item_id")
+            
+            if self.transcription_callback:
+                await self.transcription_callback({
+                    "type": "partial",
+                    "text": delta_text,
+                    "item_id": item_id,
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        elif event_type == "conversation.item.input_audio_transcription.completed":
+            # Final transcription result
+            transcript = event.get("transcript", "")
+            item_id = event.get("item_id")
+            confidence_score = self._calculate_confidence(event.get("logprobs", []))
+            
+            if self.transcription_callback:
+                await self.transcription_callback({
+                    "type": "final",
+                    "text": transcript,
+                    "item_id": item_id,
+                    "confidence": confidence_score,
+                    "timestamp": datetime.now().isoformat()
+                })
+        
+        elif event_type == "input_audio_buffer.committed":
+            # Audio buffer committed for processing
+            self.logger.debug(f"Audio buffer committed: {event.get('item_id')}")
+        
+        elif event_type == "error":
+            # Handle API errors
+            error_msg = event.get("error", {}).get("message", "Unknown error")
+            self.logger.error(f"Transcription API error: {error_msg}")
+    
+    def _calculate_confidence(self, logprobs: list) -> float:
+        """
+        Calculate confidence score from logprobs
+        
+        Args:
+            logprobs: List of log probabilities for each token
+            
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        if not logprobs:
+            return 0.0
+        
+        # Convert log probabilities to probabilities and calculate average
+        probs = [min(1.0, max(0.0, 2 ** logprob)) for logprob in logprobs if logprob is not None]
+        return sum(probs) / len(probs) if probs else 0.0
+    
+    def set_transcription_callback(self, callback: Callable):
+        """
+        Set callback function for transcription results
+        
+        Args:
+            callback: Async function to handle transcription events
+        """
+        self.transcription_callback = callback
+    
+    async def disconnect(self):
+        """
+        Close WebSocket connection
+        """
+        if self.websocket and not self.websocket.closed:
+            await self.websocket.close()
+        self.is_connected = False
+        self.session_id = None
+        self.logger.info("Disconnected from GPT-4o transcription service")
+
+# Example usage and testing
+async def example_transcription_handler(transcription_data: Dict[str, Any]):
+    """
+    Example callback function for handling transcription results
+    """
+    if transcription_data["type"] == "partial":
+        print(f"Partial: {transcription_data['text']}")
+    elif transcription_data["type"] == "final":
+        print(f"Final: {transcription_data['text']} (confidence: {transcription_data['confidence']:.2f})")
+
+# Integration example
+async def main():
+    service = GPT4oTranscriptionService("your-openai-api-key")
+    service.set_transcription_callback(example_transcription_handler)
+    
+    if await service.connect():
+        # Start listening in background
+        listen_task = asyncio.create_task(service.listen_for_transcriptions())
+        
+        # Example: Send audio chunks
+        # audio_data = get_audio_from_microphone()  # Implement this
+        # await service.send_audio_chunk(audio_data)
+        
+        await listen_task
+```
+
+### 2. Update Voice Service Integration
+
+Modify [backend/services/voice_service.py](mdc:backend/services/voice_service.py):
+
+```python
+import asyncio
+from .gpt4o_transcription_service import GPT4oTranscriptionService
+from ..utils.config import get_openai_api_key
+
+class VoiceService:
+    """
+    Enhanced voice service with GPT-4o real-time transcription
+    """
+    
+    def __init__(self):
+        self.transcription_service = GPT4oTranscriptionService(get_openai_api_key())
+        self.current_transcription = ""
+        self.is_recording = False
+        self.macro_matching_service = None  # Initialize from macro_matching_service.py
+        
+    async def initialize(self):
+        """
+        Initialize voice service and establish transcription connection
+        """
+        success = await self.transcription_service.connect()
+        if success:
+            self.transcription_service.set_transcription_callback(self._handle_transcription_result)
+            # Start listening for transcriptions
+            asyncio.create_task(self.transcription_service.listen_for_transcriptions())
+        return success
+    
+    async def _handle_transcription_result(self, transcription_data):
+        """
+        Process transcription results and trigger macro matching
+        """
+        if transcription_data["type"] == "final":
+            transcript = transcription_data["text"]
+            confidence = transcription_data["confidence"]
+            
+            # Only process high-confidence transcriptions
+            if confidence > 0.7:
+                # Trigger macro matching in macro_matching_service.py
+                if self.macro_matching_service:
+                    await self.macro_matching_service.process_voice_command(
+                        transcript, confidence
+                    )
+                
+                # Log the transcription
+                self._log_transcription(transcript, confidence)
+    
+    async def start_recording(self):
+        """
+        Start recording and transcribing audio
+        """
+        self.is_recording = True
+        # Implementation depends on audio capture method
+        # This should integrate with existing microphone capture in voice_service.py
+    
+    async def stop_recording(self):
+        """
+        Stop recording audio
+        """
+        self.is_recording = False
+        # Commit any remaining audio buffer
+        await self.transcription_service.commit_audio_buffer()
+```
+
+### 3. WebSocket API Integration
+
+Update [backend/api/server.py](mdc:backend/api/server.py):
+
+```python
+from flask import Flask
+from flask_socketio import SocketIO, emit
+import asyncio
+import base64
+
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+@socketio.on('start_voice_recognition')
+def handle_start_voice_recognition():
+    """
+    Handle request to start voice recognition from C# frontend
+    """
+    try:
+        # Initialize voice service if not already done
+        asyncio.run(voice_service.start_recording())
+        emit('voice_recognition_started', {'status': 'success'})
+    except Exception as e:
+        emit('voice_recognition_error', {'error': str(e)})
+
+@socketio.on('audio_chunk')
+def handle_audio_chunk(data):
+    """
+    Handle incoming audio chunks from C# frontend
+    """
+    try:
+        # Decode base64 audio data
+        audio_bytes = base64.b64decode(data['audio'])
+        
+        # Send to transcription service
+        asyncio.run(voice_service.transcription_service.send_audio_chunk(audio_bytes))
+        
+    except Exception as e:
+        emit('audio_processing_error', {'error': str(e)})
+
+@socketio.on('stop_voice_recognition')
+def handle_stop_voice_recognition():
+    """
+    Handle request to stop voice recognition
+    """
+    try:
+        asyncio.run(voice_service.stop_recording())
+        emit('voice_recognition_stopped', {'status': 'success'})
+    except Exception as e:
+        emit('voice_recognition_error', {'error': str(e)})
+
+# Emit transcription results to frontend
+async def send_transcription_to_frontend(transcription_data):
+    """
+    Send transcription results to C# frontend via WebSocket
+    """
+    socketio.emit('transcription_result', {
+        'type': transcription_data['type'],
+        'text': transcription_data['text'],
+        'confidence': transcription_data.get('confidence', 0.0),
+        'timestamp': transcription_data['timestamp']
+    })
+```
+
+### 4. C# Frontend Integration
+
+Update [VoiceMacroPro/Services/VoiceRecognitionWrapperService.cs](mdc:VoiceMacroPro/Services/VoiceRecognitionWrapperService.cs):
+
+```csharp
+using System;
+using System.Threading.Tasks;
+using SocketIOClient;
+using NAudio.Wave;
+using System.IO;
+
+public class VoiceRecognitionWrapperService
+{
+    private SocketIOClient.SocketIO _socket;
+    private WaveInEvent _waveIn;
+    private bool _isRecording = false;
+    
+    public event EventHandler<TranscriptionResult> TranscriptionReceived;
+    public event EventHandler<string> ErrorOccurred;
+    
+    public async Task<bool> InitializeAsync()
+    {
+        try
+        {
+            // Connect to Python backend WebSocket
+            _socket = new SocketIOClient.SocketIO("http://localhost:5000");
+            
+            // Setup event handlers
+            _socket.On("transcription_result", HandleTranscriptionResult);
+            _socket.On("voice_recognition_error", HandleError);
+            
+            await _socket.ConnectAsync();
+            
+            // Initialize audio capture
+            InitializeAudioCapture();
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ErrorOccurred?.Invoke(this, $"Initialization failed: {ex.Message}");
+            return false;
+        }
+    }
+    
+    private void InitializeAudioCapture()
+    {
+        _waveIn = new WaveInEvent();
+        _waveIn.WaveFormat = new WaveFormat(24000, 16, 1); // 24kHz, 16-bit, mono for GPT-4o
+        _waveIn.BufferMilliseconds = 100; // 100ms buffers for real-time processing
+        
+        _waveIn.DataAvailable += OnAudioDataAvailable;
+    }
+    
+    private async void OnAudioDataAvailable(object sender, WaveInEventArgs e)
+    {
+        if (_isRecording && _socket.Connected)
+        {
+            // Convert audio data to base64 and send to backend
+            string audioBase64 = Convert.ToBase64String(e.Buffer, 0, e.BytesRecorded);
+            
+            await _socket.EmitAsync("audio_chunk", new { audio = audioBase64 });
+        }
+    }
+    
+    public async Task StartRecordingAsync()
+    {
+        if (!_isRecording)
+        {
+            _isRecording = true;
+            _waveIn.StartRecording();
+            await _socket.EmitAsync("start_voice_recognition");
+        }
+    }
+    
+    public async Task StopRecordingAsync()
+    {
+        if (_isRecording)
+        {
+            _isRecording = false;
+            _waveIn.StopRecording();
+            await _socket.EmitAsync("stop_voice_recognition");
+        }
+    }
+    
+    private void HandleTranscriptionResult(SocketIOResponse response)
+    {
+        var data = response.GetValue<TranscriptionData>();
+        
+        var result = new TranscriptionResult
+        {
+            Type = data.type,
+            Text = data.text,
+            Confidence = data.confidence,
+            Timestamp = DateTime.Parse(data.timestamp)
+        };
+        
+        TranscriptionReceived?.Invoke(this, result);
+    }
+    
+    private void HandleError(SocketIOResponse response)
+    {
+        var error = response.GetValue<ErrorData>();
+        ErrorOccurred?.Invoke(this, error.error);
+    }
+    
+    public void Dispose()
+    {
+        _waveIn?.Dispose();
+        _socket?.DisconnectAsync();
+    }
+}
+
+public class TranscriptionResult
+{
+    public string Type { get; set; }
+    public string Text { get; set; }
+    public double Confidence { get; set; }
+    public DateTime Timestamp { get; set; }
+}
+
+public class TranscriptionData
+{
+    public string type { get; set; }
+    public string text { get; set; }
+    public double confidence { get; set; }
+    public string timestamp { get; set; }
+}
+
+public class ErrorData
+{
+    public string error { get; set; }
+}
+```
+
+## Configuration Requirements
+
+### 1. Environment Variables
+Add to [backend/utils/config.py](mdc:backend/utils/config.py):
+
+```python
+import os
+
+def get_openai_api_key():
+    """Get OpenAI API key from environment variables"""
+    return os.getenv('OPENAI_API_KEY')
+
+def get_transcription_config():
+    """Get transcription configuration"""
+    return {
+        'model': 'gpt-4o-transcribe',
+        'language': 'ko',  # Korean for VoiceMacro Pro
+        'noise_reduction': 'near_field',
+        'vad_threshold': 0.5,
+        'confidence_threshold': 0.7
+    }
+```
+
+### 2. Dependencies Update
+Add to [requirements.txt](mdc:requirements.txt):
+
+```
+websockets>=11.0.0
+openai>=1.3.0
+```
+
+Add to [VoiceMacroPro/VoiceMacroPro.csproj](mdc:VoiceMacroPro/VoiceMacroPro.csproj):
+
+```xml
+<PackageReference Include="SocketIOClient" Version="3.0.6" />
+<PackageReference Include="NAudio" Version="2.2.1" />
+```
+
+## Performance Optimizations
+
+### Audio Buffer Management
+- Use 100ms audio buffers for optimal real-time performance
+- Implement circular buffer for continuous audio streaming
+- Add audio quality monitoring and automatic adjustment
+
+### Connection Resilience
+- Implement automatic reconnection logic
+- Add connection health monitoring
+- Fallback to cached Whisper model if GPT-4o is unavailable
+
+### Error Handling
+- Comprehensive error logging in [backend/services/voice_service.py](mdc:backend/services/voice_service.py)
+- User-friendly error messages in [VoiceMacroPro/Views/VoiceRecognitionView.xaml.cs](mdc:VoiceMacroPro/Views/VoiceRecognitionView.xaml.cs)
+- Graceful degradation when API is unavailable
+
+## Testing Strategy
+
+### Unit Tests
+Create tests in [backend/tests/](mdc:backend/tests/) directory:
+- `test_gpt4o_transcription.py` - Test transcription service
+- `test_voice_service_integration.py` - Test voice service integration
+- `test_realtime_api_connection.py` - Test WebSocket connectivity
+
+### Integration Tests
+- End-to-end voice recognition pipeline testing
+- Audio quality and latency benchmarks
+- Macro matching accuracy with GPT-4o transcriptions
+
+## Migration Steps
+
+1. **Backup Current System**: Save current [backend/services/whisper_service.py](mdc:backend/services/whisper_service.py)
+2. **Implement GPT-4o Service**: Create new transcription service
+3. **Update Voice Service**: Integrate GPT-4o with existing voice processing
+4. **Modify Frontend**: Update C# WebSocket communication
+5. **Testing**: Comprehensive testing with real voice commands
+6. **Deployment**: Gradual rollout with fallback to Whisper if needed
+
+## Security Considerations
+
+- Store OpenAI API key securely in environment variables
+- Implement rate limiting for API calls
+- Add audio data encryption for sensitive voice commands
+- Validate all incoming WebSocket data
+
+## Monitoring and Analytics
+
+- Track transcription accuracy and confidence scores
+- Monitor API response times and connection stability
+- Log voice command recognition success rates
+- Implement usage analytics for optimization
+
+This implementation provides a robust, real-time voice recognition system using GPT-4o-transcribe while maintaining compatibility with the existing VoiceMacro Pro architecture.

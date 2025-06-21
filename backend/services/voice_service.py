@@ -1,6 +1,6 @@
 """
 VoiceMacro Pro - 음성 인식 서비스
-실시간 음성 녹음, OpenAI Whisper 분석, 매크로 매칭 기능 제공
+실시간 음성 녹음, GPT-4o 트랜스크립션, 매크로 매칭 기능 제공
 """
 
 import threading
@@ -8,15 +8,19 @@ import time
 import queue
 import numpy as np
 import sounddevice as sd
+import asyncio
 from typing import Optional, Callable, Dict, List
 import logging
 from backend.utils.common_utils import get_logger
+from backend.services.gpt4o_transcription_service import GPT4oTranscriptionService
+from backend.utils.config import Config
 
 
 class VoiceRecognitionService:
     """
     음성 인식 서비스 클래스
     - 실시간 음성 녹음
+    - GPT-4o 트랜스크립션
     - 마이크 권한 관리  
     - 음성 입력 레벨 모니터링
     - 백그라운드 녹음 기능
@@ -26,10 +30,10 @@ class VoiceRecognitionService:
         """음성 인식 서비스 초기화"""
         self.logger = get_logger(__name__)
         
-        # 녹음 설정
-        self.sample_rate = 16000  # Whisper 권장 샘플레이트
+        # 녹음 설정 (GPT-4o 최적화)
+        self.sample_rate = 24000  # GPT-4o 권장 샘플레이트
         self.channels = 1  # 모노 채널
-        self.chunk_size = 1024  # 버퍼 크기
+        self.chunk_size = int(Config.GPT4O_BUFFER_SIZE_MS * self.sample_rate / 1000)  # 100ms 버퍼
         
         # 녹음 상태 관리
         self.is_recording = False
@@ -40,14 +44,107 @@ class VoiceRecognitionService:
         self.current_device_id = None
         self.available_devices = []
         
+        # GPT-4o 트랜스크립션 서비스
+        self.gpt4o_service: Optional[GPT4oTranscriptionService] = None
+        self.gpt4o_enabled = Config.GPT4O_ENABLED
+        self.confidence_threshold = Config.GPT4O_CONFIDENCE_THRESHOLD
+        
+        # 비동기 루프 관리
+        self.event_loop = None
+        self.loop_thread = None
+        
         # 콜백 함수들
         self.audio_level_callback: Optional[Callable[[float], None]] = None
         self.recording_status_callback: Optional[Callable[[bool], None]] = None
+        self.transcription_callback: Optional[Callable[[Dict], None]] = None
         
         # 초기화
         self._initialize_audio_devices()
         
-        self.logger.info("음성 인식 서비스가 초기화되었습니다.")
+        if self.gpt4o_enabled and Config.OPENAI_API_KEY:
+            self._initialize_gpt4o_service()
+        
+        self.logger.info(f"음성 인식 서비스가 초기화되었습니다. (GPT-4o: {'활성' if self.gpt4o_enabled else '비활성'})")
+    
+    def _initialize_gpt4o_service(self):
+        """GPT-4o 트랜스크립션 서비스 초기화"""
+        try:
+            self.gpt4o_service = GPT4oTranscriptionService(Config.OPENAI_API_KEY)
+            self.gpt4o_service.set_transcription_callback(self._handle_transcription_result)
+            
+            # 비동기 루프 시작
+            self._start_async_loop()
+            
+            self.logger.info("GPT-4o 트랜스크립션 서비스가 초기화되었습니다.")
+            
+        except Exception as e:
+            self.logger.error(f"GPT-4o 서비스 초기화 실패: {e}")
+            self.gpt4o_enabled = False
+    
+    def _start_async_loop(self):
+        """비동기 이벤트 루프 시작"""
+        def run_loop():
+            self.event_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.event_loop)
+            self.event_loop.run_forever()
+        
+        self.loop_thread = threading.Thread(target=run_loop, daemon=True)
+        self.loop_thread.start()
+        
+        # 루프가 시작될 때까지 잠시 대기
+        time.sleep(0.1)
+    
+    async def _handle_transcription_result(self, transcription_data: Dict):
+        """
+        GPT-4o 트랜스크립션 결과 처리
+        
+        Args:
+            transcription_data (Dict): 트랜스크립션 결과 데이터
+        """
+        try:
+            if transcription_data["type"] == "final":
+                transcript = transcription_data["text"].strip()
+                confidence = transcription_data["confidence"]
+                
+                self.logger.info(f"음성 인식 결과: '{transcript}' (신뢰도: {confidence:.2f})")
+                
+                # 신뢰도 임계값 확인
+                if confidence >= self.confidence_threshold:
+                    # 트랜스크립션 콜백 호출 (메인 스레드에서)
+                    if self.transcription_callback:
+                        # 스레드 안전하게 콜백 실행
+                        def call_callback():
+                            try:
+                                self.transcription_callback({
+                                    "transcript": transcript,
+                                    "confidence": confidence,
+                                    "timestamp": transcription_data["timestamp"],
+                                    "success": True
+                                })
+                            except Exception as e:
+                                self.logger.error(f"트랜스크립션 콜백 실행 오류: {e}")
+                        
+                        # 메인 스레드에서 콜백 실행
+                        threading.Thread(target=call_callback, daemon=True).start()
+                else:
+                    self.logger.warning(f"낮은 신뢰도로 인한 무시: {confidence:.2f} < {self.confidence_threshold}")
+                    
+            elif transcription_data["type"] == "partial":
+                # 부분 트랜스크립션은 로그만 기록
+                self.logger.debug(f"부분 인식: {transcription_data['text']}")
+                
+        except Exception as e:
+            self.logger.error(f"트랜스크립션 결과 처리 오류: {e}")
+    
+    def set_transcription_callback(self, callback: Callable[[Dict], None]):
+        """
+        트랜스크립션 결과 콜백 함수 설정
+        
+        Args:
+            callback (Callable[[Dict], None]): 트랜스크립션 결과를 받을 콜백 함수
+        """
+        self.transcription_callback = callback
+        self.logger.debug("트랜스크립션 콜백 함수가 설정되었습니다.")
     
     def _initialize_audio_devices(self):
         """사용 가능한 오디오 장치 초기화 (안전한 방법)"""
@@ -217,7 +314,7 @@ class VoiceRecognitionService:
     
     def _audio_callback(self, indata, frames, time, status):
         """
-        오디오 입력 콜백 함수
+        오디오 입력 콜백 함수 - GPT-4o 트랜스크립션 연동
         sounddevice에서 호출됨
         """
         if status:
@@ -225,6 +322,10 @@ class VoiceRecognitionService:
         
         # 오디오 데이터를 큐에 추가
         audio_data = indata.copy()
+        
+        # GPT-4o 서비스로 오디오 데이터 전송
+        if self.gpt4o_enabled and self.gpt4o_service and self.gpt4o_service.is_connected:
+            self._send_audio_to_gpt4o(audio_data)
         
         # 음성 레벨 계산 (RMS)
         if self.audio_level_callback:
@@ -237,9 +338,31 @@ class VoiceRecognitionService:
         if not self.audio_queue.full():
             self.audio_queue.put(audio_data)
     
+    def _send_audio_to_gpt4o(self, audio_data):
+        """
+        오디오 데이터를 GPT-4o 서비스로 전송
+        
+        Args:
+            audio_data: 오디오 데이터 (numpy array, float32)
+        """
+        try:
+            # float32 numpy array를 int16 PCM으로 변환
+            # GPT-4o는 PCM16 형식을 요구함
+            audio_int16 = (audio_data.flatten() * 32767).astype(np.int16)
+            audio_bytes = audio_int16.tobytes()
+            
+            # 비동기적으로 오디오 전송
+            if self.event_loop and not self.event_loop.is_closed():
+                asyncio.run_coroutine_threadsafe(
+                    self.gpt4o_service.send_audio_chunk(audio_bytes),
+                    self.event_loop
+                )
+        except Exception as e:
+            self.logger.error(f"GPT-4o 오디오 전송 오류: {e}")
+    
     def start_recording(self) -> bool:
         """
-        실시간 녹음 시작
+        실시간 녹음 시작 - GPT-4o 트랜스크립션 연결 포함
         
         Returns:
             bool: 녹음 시작 성공 여부
@@ -249,6 +372,31 @@ class VoiceRecognitionService:
             return False
         
         try:
+            # GPT-4o 서비스 연결 시작
+            if self.gpt4o_enabled and self.gpt4o_service:
+                self.logger.info("GPT-4o 트랜스크립션 서비스 연결 중...")
+                
+                # 비동기적으로 연결 시도
+                if self.event_loop and not self.event_loop.is_closed():
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.gpt4o_service.connect(),
+                        self.event_loop
+                    )
+                    # 연결 결과 대기 (최대 5초)
+                    try:
+                        connection_success = future.result(timeout=5.0)
+                        if connection_success:
+                            self.logger.info("GPT-4o 서비스 연결 성공")
+                            # 백그라운드에서 트랜스크립션 수신 시작
+                            asyncio.run_coroutine_threadsafe(
+                                self.gpt4o_service.listen_for_transcriptions(),
+                                self.event_loop
+                            )
+                        else:
+                            self.logger.warning("GPT-4o 서비스 연결 실패 - 기본 모드로 계속")
+                    except Exception as e:
+                        self.logger.warning(f"GPT-4o 연결 타임아웃: {e} - 기본 모드로 계속")
+            
             # 오디오 큐 초기화
             while not self.audio_queue.empty():
                 self.audio_queue.get()
@@ -282,7 +430,7 @@ class VoiceRecognitionService:
     
     def stop_recording(self) -> bool:
         """
-        실시간 녹음 중지
+        실시간 녹음 중지 - GPT-4o 트랜스크립션 연결 해제 포함
         
         Returns:
             bool: 녹음 중지 성공 여부
@@ -298,6 +446,21 @@ class VoiceRecognitionService:
             if hasattr(self, 'stream'):
                 self.stream.stop()
                 self.stream.close()
+            
+            # GPT-4o 서비스 연결 해제
+            if self.gpt4o_enabled and self.gpt4o_service and self.gpt4o_service.is_connected:
+                if self.event_loop and not self.event_loop.is_closed():
+                    # 남은 오디오 버퍼 커밋
+                    asyncio.run_coroutine_threadsafe(
+                        self.gpt4o_service.commit_audio_buffer(),
+                        self.event_loop
+                    )
+                    # 연결 해제
+                    asyncio.run_coroutine_threadsafe(
+                        self.gpt4o_service.disconnect(),
+                        self.event_loop
+                    )
+                self.logger.info("GPT-4o 트랜스크립션 서비스 연결 해제됨")
             
             # 상태 콜백 호출
             if self.recording_status_callback:

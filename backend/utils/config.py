@@ -16,11 +16,19 @@ class Config:
     # OpenAI API 설정
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
     WHISPER_MODEL = os.getenv('WHISPER_MODEL', 'whisper-1')
+    GPT4O_TRANSCRIBE_MODEL = os.getenv('GPT4O_TRANSCRIBE_MODEL', 'gpt-4o-transcribe')
     
     # 음성 인식 설정
     VOICE_RECOGNITION_LANGUAGE = os.getenv('VOICE_RECOGNITION_LANGUAGE', 'ko')
     VOICE_RECOGNITION_TIMEOUT = int(os.getenv('VOICE_RECOGNITION_TIMEOUT', '30'))
     VOICE_RECOGNITION_MAX_FILE_SIZE = int(os.getenv('VOICE_RECOGNITION_MAX_FILE_SIZE', '25'))
+    
+    # GPT-4o 실시간 트랜스크립션 설정
+    GPT4O_ENABLED = os.getenv('GPT4O_ENABLED', 'true').lower() == 'true'
+    GPT4O_CONFIDENCE_THRESHOLD = float(os.getenv('GPT4O_CONFIDENCE_THRESHOLD', '0.7'))
+    GPT4O_VAD_THRESHOLD = float(os.getenv('GPT4O_VAD_THRESHOLD', '0.5'))
+    GPT4O_NOISE_REDUCTION = os.getenv('GPT4O_NOISE_REDUCTION', 'near_field')
+    GPT4O_BUFFER_SIZE_MS = int(os.getenv('GPT4O_BUFFER_SIZE_MS', '100'))
     
     # 오디오 설정
     SAMPLE_RATE = 16000  # Whisper 권장 샘플레이트
@@ -69,6 +77,40 @@ class Config:
         return {
             'api_key': cls.OPENAI_API_KEY,
             'timeout': cls.VOICE_RECOGNITION_TIMEOUT
+        }
+    
+    @classmethod
+    def get_gpt4o_transcription_config(cls) -> dict:
+        """
+        GPT-4o 트랜스크립션 설정 반환
+        
+        Returns:
+            dict: GPT-4o 트랜스크립션 설정
+        """
+        return {
+            'model': cls.GPT4O_TRANSCRIBE_MODEL,
+            'language': cls.VOICE_RECOGNITION_LANGUAGE,
+            'confidence_threshold': cls.GPT4O_CONFIDENCE_THRESHOLD,
+            'vad_threshold': cls.GPT4O_VAD_THRESHOLD,
+            'noise_reduction': cls.GPT4O_NOISE_REDUCTION,
+            'buffer_size_ms': cls.GPT4O_BUFFER_SIZE_MS,
+            'enabled': cls.GPT4O_ENABLED
+        }
+    
+    @classmethod
+    def get_websocket_config(cls) -> dict:
+        """
+        WebSocket 서버 설정 반환
+        
+        Returns:
+            dict: WebSocket 설정
+        """
+        return {
+            'host': 'localhost',
+            'port': 5000,
+            'cors_allowed_origins': "*",
+            'reconnect_attempts': 3,
+            'reconnect_delay': 5
         }
 
 
