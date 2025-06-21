@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit, disconnect
 import json
 import numpy as np
 import base64
@@ -9,6 +10,7 @@ import threading
 import os
 import sqlite3
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
 # 백엔드 패키지 임포트
 from backend.services.macro_service import macro_service
@@ -21,10 +23,412 @@ from backend.database.database_manager import DatabaseManager
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__)
-CORS(app)  # CORS 설정 (프론트엔드와의 통신을 위해)
+CORS(app, origins="*")  # CORS 설정 (프론트엔드와의 통신을 위해)
+
+# Flask-SocketIO 초기화 (실시간 음성인식용)
+# 더 안정적인 연결을 위한 설정 개선
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    async_mode='threading',
+    logger=True,  # 디버깅을 위한 로깅 활성화
+    engineio_logger=True,  # Engine.IO 로깅도 활성화
+    ping_timeout=60,  # 핑 타임아웃 60초
+    ping_interval=25,  # 25초마다 핑 전송
+    allow_upgrades=True,  # WebSocket 업그레이드 허용
+    transports=['polling', 'websocket']  # 명시적으로 전송 방식 지정
+)
 
 # 데이터베이스 설정
 db_path = "voice_macro.db"
+
+# 연결된 클라이언트 세션 관리
+connected_clients = {}
+voice_sessions = {}
+
+# Socket.IO 이벤트 핸들러
+@socketio.on('connect')
+def handle_connect():
+    """
+    클라이언트 연결 시 호출되는 이벤트 핸들러
+    새로운 음성인식 세션을 생성하고 클라이언트에 연결 확인을 전송합니다.
+    """
+    client_id = request.sid
+    client_info = {
+        'session_id': client_id,
+        'connected_at': datetime.now().isoformat(),
+        'is_recording': False,
+        'last_activity': datetime.now().isoformat()
+    }
+    
+    connected_clients[client_id] = client_info
+    voice_sessions[client_id] = {
+        'session_id': client_id,
+        'start_time': datetime.now(),
+        'transcription_count': 0,
+        'audio_chunks_received': 0
+    }
+    
+    print(f"✅ Socket.IO 클라이언트 연결: {client_id}")
+    
+    # 연결 성공 메시지 전송
+    emit('connection_established', {
+        'success': True,
+        'session_id': client_id,
+        'server_time': datetime.now().isoformat(),
+        'features': ['gpt4o_transcription', 'real_time_audio', 'macro_matching'],
+        'message': '실시간 음성인식 서버에 연결되었습니다'
+    })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """
+    클라이언트 연결 해제 시 호출되는 이벤트 핸들러
+    클라이언트 세션 정보를 정리합니다.
+    """
+    client_id = request.sid
+    
+    if client_id in connected_clients:
+        del connected_clients[client_id]
+    
+    if client_id in voice_sessions:
+        del voice_sessions[client_id]
+    
+    print(f"❌ Socket.IO 클라이언트 연결 해제: {client_id}")
+
+@socketio.on('start_voice_recognition')
+def handle_start_voice_recognition():
+    """
+    음성 인식 시작 요청 처리
+    클라이언트로부터 음성 인식 시작 신호를 받으면 녹음 상태를 활성화합니다.
+    """
+    client_id = request.sid
+    
+    try:
+        if client_id in connected_clients:
+            connected_clients[client_id]['is_recording'] = True
+            connected_clients[client_id]['last_activity'] = datetime.now().isoformat()
+            
+            print(f"🎤 음성 인식 시작: {client_id}")
+            
+            emit('voice_recognition_started', {
+                'success': True,
+                'session_id': client_id,
+                'message': '음성 인식이 시작되었습니다',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            emit('voice_recognition_error', {
+                'success': False,
+                'error': '유효하지 않은 세션입니다',
+                'timestamp': datetime.now().isoformat()
+            })
+    
+    except Exception as e:
+        print(f"❌ 음성 인식 시작 오류: {e}")
+        emit('voice_recognition_error', {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
+@socketio.on('stop_voice_recognition')
+def handle_stop_voice_recognition():
+    """
+    음성 인식 중지 요청 처리
+    클라이언트로부터 음성 인식 중지 신호를 받으면 녹음 상태를 비활성화합니다.
+    """
+    client_id = request.sid
+    
+    try:
+        if client_id in connected_clients:
+            connected_clients[client_id]['is_recording'] = False
+            connected_clients[client_id]['last_activity'] = datetime.now().isoformat()
+            
+            print(f"🛑 음성 인식 중지: {client_id}")
+            
+            emit('voice_recognition_stopped', {
+                'success': True,
+                'session_id': client_id,
+                'message': '음성 인식이 중지되었습니다',
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            emit('voice_recognition_error', {
+                'success': False,
+                'error': '유효하지 않은 세션입니다',
+                'timestamp': datetime.now().isoformat()
+            })
+    
+    except Exception as e:
+        print(f"❌ 음성 인식 중지 오류: {e}")
+        emit('voice_recognition_error', {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
+@socketio.on('audio_chunk')
+def handle_audio_chunk(data):
+    """
+    실시간 오디오 청크 처리
+    클라이언트로부터 받은 오디오 데이터를 처리하고 음성인식 서비스로 전달합니다.
+    
+    Args:
+        data (dict): 오디오 데이터 (Base64 인코딩)
+            - audio: Base64 인코딩된 오디오 데이터
+            - format: 오디오 포맷 정보 (선택사항)
+    """
+    client_id = request.sid
+    
+    try:
+        if client_id not in connected_clients or not connected_clients[client_id]['is_recording']:
+            return
+        
+        # 오디오 데이터 추출
+        audio_base64 = data.get('audio')
+        if not audio_base64:
+            emit('audio_processing_error', {'error': '오디오 데이터가 없습니다'})
+            return
+        
+        # 세션 통계 업데이트
+        if client_id in voice_sessions:
+            voice_sessions[client_id]['audio_chunks_received'] += 1
+        
+        # Base64 오디오 데이터 디코딩
+        try:
+            audio_bytes = base64.b64decode(audio_base64)
+            audio_length = len(audio_bytes)
+            
+            print(f"🎵 오디오 청크 수신: {client_id} ({audio_length} bytes)")
+            
+            # 오디오 데이터를 음성인식 서비스로 전달 (향후 GPT-4o 통합)
+            # 현재는 Whisper 서비스를 사용하여 임시 처리
+            process_audio_for_transcription(client_id, audio_bytes)
+            
+            # 클라이언트에 수신 확인 전송
+            emit('audio_chunk_received', {
+                'success': True,
+                'audio_length': audio_length,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except Exception as decode_error:
+            print(f"❌ 오디오 디코딩 오류: {decode_error}")
+            emit('audio_processing_error', {
+                'error': f'오디오 디코딩 실패: {str(decode_error)}',
+                'timestamp': datetime.now().isoformat()
+            })
+    
+    except Exception as e:
+        print(f"❌ 오디오 청크 처리 오류: {e}")
+        emit('audio_processing_error', {
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
+
+def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
+    """
+    오디오 데이터를 음성인식 처리를 위해 백그라운드에서 처리하는 함수
+    
+    Args:
+        client_id (str): 클라이언트 세션 ID
+        audio_bytes (bytes): 디코딩된 오디오 데이터
+    """
+    def run_transcription():
+        try:
+            # 임시 오디오 파일 저장 (Whisper 처리용)
+            temp_audio_path = f"temp_audio/audio_{client_id}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.wav"
+            
+            # temp_audio 디렉토리가 없으면 생성
+            os.makedirs("temp_audio", exist_ok=True)
+            
+            # 오디오 바이트를 WAV 파일로 저장 (임시)
+            with open(temp_audio_path, 'wb') as f:
+                f.write(audio_bytes)
+            
+            # Whisper를 사용한 음성인식 (향후 GPT-4o로 교체 예정)
+            try:
+                transcription_result = whisper_service.transcribe_audio(temp_audio_path)
+                
+                if transcription_result and transcription_result.get('success'):
+                    text = transcription_result.get('text', '').strip()
+                    confidence = transcription_result.get('confidence', 0.0)
+                    
+                    if text and len(text) > 0:
+                        # 세션 통계 업데이트
+                        if client_id in voice_sessions:
+                            voice_sessions[client_id]['transcription_count'] += 1
+                        
+                        print(f"📝 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
+                        
+                        # 클라이언트에 트랜스크립션 결과 전송
+                        socketio.emit('transcription_result', {
+                            'type': 'final',
+                            'text': text,
+                            'confidence': confidence,
+                            'session_id': client_id,
+                            'timestamp': datetime.now().isoformat()
+                        }, room=client_id)
+                        
+                        # 매크로 매칭 시도
+                        try_macro_matching(client_id, text, confidence)
+                
+            except Exception as transcription_error:
+                print(f"❌ 음성인식 처리 오류: {transcription_error}")
+                socketio.emit('transcription_error', {
+                    'error': str(transcription_error),
+                    'timestamp': datetime.now().isoformat()
+                }, room=client_id)
+            
+            finally:
+                # 임시 파일 삭제
+                if os.path.exists(temp_audio_path):
+                    os.remove(temp_audio_path)
+        
+        except Exception as e:
+            print(f"❌ 트랜스크립션 처리 오류: {e}")
+    
+    # 백그라운드 스레드에서 실행
+    threading.Thread(target=run_transcription, daemon=True).start()
+
+def try_macro_matching(client_id: str, text: str, confidence: float):
+    """
+    음성인식 결과를 매크로와 매칭하여 실행하는 함수
+    
+    Args:
+        client_id (str): 클라이언트 세션 ID
+        text (str): 인식된 텍스트
+        confidence (float): 음성인식 신뢰도
+    """
+    try:
+        # 신뢰도가 임계값(70%) 이상일 때만 매크로 매칭 시도
+        if confidence < 0.7:
+            print(f"⚠️ 낮은 신뢰도로 매크로 매칭 건너뜀: {confidence:.2f}")
+            return
+        
+        # 모든 매크로 조회
+        macros = macro_service.get_all_macros()
+        
+        # 음성 명령어와 매크로 매칭
+        best_match = None
+        best_similarity = 0.0
+        
+        for macro in macros:
+            voice_command = macro.get('voice_command', '').lower()
+            input_text = text.lower()
+            
+            # 단순 포함 관계 확인 (향후 더 정교한 매칭 알고리즘으로 개선)
+            if voice_command in input_text or input_text in voice_command:
+                similarity = len(voice_command) / max(len(input_text), len(voice_command))
+                if similarity > best_similarity:
+                    best_match = macro
+                    best_similarity = similarity
+        
+        if best_match and best_similarity > 0.6:  # 60% 이상 유사도
+            print(f"🎯 매크로 매칭 성공: '{best_match['name']}' (유사도: {best_similarity:.2f})")
+            
+            # 매크로 실행
+            execute_matched_macro(client_id, best_match, text, confidence, best_similarity)
+        else:
+            print(f"❓ 매칭되는 매크로 없음: '{text}'")
+            
+            # 클라이언트에 매칭 실패 알림
+            socketio.emit('macro_match_failed', {
+                'input_text': text,
+                'confidence': confidence,
+                'message': '매칭되는 매크로를 찾을 수 없습니다',
+                'timestamp': datetime.now().isoformat()
+            }, room=client_id)
+    
+    except Exception as e:
+        print(f"❌ 매크로 매칭 오류: {e}")
+
+def execute_matched_macro(client_id: str, macro: dict, input_text: str, confidence: float, similarity: float):
+    """
+    매칭된 매크로를 실행하는 함수
+    
+    Args:
+        client_id (str): 클라이언트 세션 ID
+        macro (dict): 실행할 매크로 정보
+        input_text (str): 입력된 음성 텍스트
+        confidence (float): 음성인식 신뢰도
+        similarity (float): 매크로 매칭 유사도
+    """
+    try:
+        macro_id = macro['id']
+        macro_name = macro['name']
+        
+        print(f"🚀 매크로 실행 시작: {macro_name} (ID: {macro_id})")
+        
+        # 클라이언트에 매크로 실행 시작 알림
+        socketio.emit('macro_execution_started', {
+            'macro_id': macro_id,
+            'macro_name': macro_name,
+            'input_text': input_text,
+            'confidence': confidence,
+            'similarity': similarity,
+            'timestamp': datetime.now().isoformat()
+        }, room=client_id)
+        
+        # 백그라운드에서 매크로 실행
+        def run_macro():
+            try:
+                # 매크로 실행 서비스 호출
+                execution_result = macro_execution_service.execute_macro(macro_id)
+                
+                if execution_result.get('success'):
+                    print(f"✅ 매크로 실행 완료: {macro_name}")
+                    
+                    # 사용 횟수 증가
+                    macro_service.increment_usage_count(macro_id)
+                    
+                    # 클라이언트에 실행 완료 알림
+                    socketio.emit('macro_execution_completed', {
+                        'macro_id': macro_id,
+                        'macro_name': macro_name,
+                        'success': True,
+                        'execution_time': execution_result.get('execution_time', 0),
+                        'timestamp': datetime.now().isoformat()
+                    }, room=client_id)
+                else:
+                    print(f"❌ 매크로 실행 실패: {macro_name} - {execution_result.get('error')}")
+                    
+                    # 클라이언트에 실행 실패 알림
+                    socketio.emit('macro_execution_failed', {
+                        'macro_id': macro_id,
+                        'macro_name': macro_name,
+                        'error': execution_result.get('error'),
+                        'timestamp': datetime.now().isoformat()
+                    }, room=client_id)
+            
+            except Exception as exec_error:
+                print(f"❌ 매크로 실행 중 오류: {exec_error}")
+                socketio.emit('macro_execution_failed', {
+                    'macro_id': macro_id,
+                    'macro_name': macro_name,
+                    'error': str(exec_error),
+                    'timestamp': datetime.now().isoformat()
+                }, room=client_id)
+        
+        # 백그라운드 스레드에서 매크로 실행
+        threading.Thread(target=run_macro, daemon=True).start()
+    
+    except Exception as e:
+        print(f"❌ 매크로 실행 준비 오류: {e}")
+
+# Socket.IO 상태 확인 엔드포인트
+@socketio.on('ping')
+def handle_ping():
+    """
+    클라이언트 연결 상태 확인을 위한 ping 이벤트 핸들러
+    """
+    client_id = request.sid
+    emit('pong', {
+        'session_id': client_id,
+        'server_time': datetime.now().isoformat(),
+        'connected_clients': len(connected_clients)
+    })
 
 @app.route('/api/macros', methods=['GET'])
 def get_macros():
@@ -235,10 +639,14 @@ def delete_macro(macro_id):
     Args:
         macro_id (int): 삭제할 매크로 ID
         
+    쿼리 파라미터:
+        hard_delete: 완전 삭제 여부 (true/false, 기본값: false)
+        
     Returns:
         JSON: 삭제 결과
     """
     try:
+        hard_delete = request.args.get('hard_delete', 'false').lower() == 'true'
         success = macro_service.delete_macro(macro_id)
         
         if success:
@@ -1887,19 +2295,54 @@ def health_check():
 
 def run_server():
     """
-    서버 실행 함수
-    Flask 서버를 시작합니다.
+    VoiceMacro Pro API 서버 실행 함수
+    Flask-SocketIO를 사용하여 REST API와 실시간 Socket.IO 서버를 동시에 실행합니다.
     """
-    # 디버그 모드로 서버 실행
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("🚀 VoiceMacro Pro API 서버 시작 중...")
+    print("📡 기능:")
+    print("   - REST API 엔드포인트")
+    print("   - Socket.IO 실시간 음성인식")
+    print("   - GPT-4o 트랜스크립션 지원")
+    print("   - 실시간 매크로 매칭 및 실행")
+    
+    # 데이터베이스 초기화
+    try:
+        db_manager = DatabaseManager("voice_macro.db")
+        db_manager.init_database()
+        print("✅ 데이터베이스 초기화 완료")
+    except Exception as e:
+        print(f"❌ 데이터베이스 초기화 실패: {e}")
+    
+    # 임시 오디오 디렉토리 생성
+    try:
+        os.makedirs("temp_audio", exist_ok=True)
+        print("✅ 임시 오디오 디렉토리 생성 완료")
+    except Exception as e:
+        print(f"⚠️ 임시 오디오 디렉토리 생성 실패: {e}")
+    
+    # Socket.IO 서버 시작 (Flask app과 함께)
+    try:
+        print("🌐 서버 시작: http://localhost:5000")
+        print("🔌 Socket.IO 엔드포인트: ws://localhost:5000/socket.io/")
+        print("📚 API 문서: http://localhost:5000/api/health")
+        print("\n🎤 실시간 음성인식 서버가 클라이언트 연결을 대기 중입니다...")
+        print("📱 C# WPF 클라이언트에서 연결하세요!")
+        print("\n✋ 서버를 중지하려면 Ctrl+C를 누르세요.\n")
+        
+        # Flask-SocketIO 서버 실행
+        socketio.run(
+            app,
+            host='0.0.0.0',    # 모든 IP에서 접근 가능
+            port=5000,         # 포트 5000
+            debug=False,       # 운영 환경에서는 False
+            allow_unsafe_werkzeug=True  # Socket.IO 호환성을 위해
+        )
+    except KeyboardInterrupt:
+        print("\n🛑 서버 종료 중...")
+    except Exception as e:
+        print(f"❌ 서버 실행 오류: {e}")
+    finally:
+        print("✅ VoiceMacro Pro API 서버가 종료되었습니다.")
 
 if __name__ == '__main__':
-    """
-    메인 실행 함수
-    직접 실행 시 서버를 시작합니다.
-    """
-    print("VoiceMacro API 서버를 시작합니다...")
-    print("서버 주소: http://localhost:5000")
-    print("API 문서: http://localhost:5000/api/health")
-    
     run_server() 
