@@ -1630,7 +1630,8 @@ def execute_custom_script(script_id):
         JSON: 실행 결과
     """
     try:
-        data = request.get_json()
+        # JSON 데이터가 없어도 처리할 수 있도록 수정
+        data = request.get_json(silent=True) or {}
         context = data.get('context') if data else None
         
         # 비동기 실행을 위한 스레드 처리
