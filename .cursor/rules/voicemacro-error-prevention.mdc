@@ -1,0 +1,238 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# VoiceMacro Pro 오류 방지 가이드
+
+## 1. 빌드 오류 방지
+
+### Null 참조 오류
+- 모든 참조 타입에 초기값 할당
+- nullable 타입 적절히 사용
+- 생성자에서 필수 필드 초기화
+
+### 네임스페이스 충돌
+- 클래스명 중복 확인
+- 명확한 네임스페이스 구조
+- using 문 정리
+
+### 메모리 관리
+- IDisposable 구현
+- 리소스 해제 확인
+- 이벤트 핸들러 정리
+
+## 2. 런타임 오류 방지
+
+### 예외 처리
+```csharp
+try
+{
+    // 작업 수행
+}
+catch (SpecificException ex)
+{
+    _logger.LogError(ex, "구체적인 오류 발생");
+    // 적절한 처리
+}
+catch (Exception ex)
+{
+    _logger.LogError(ex, "예상치 못한 오류");
+    // 기본 처리
+}
+```
+
+### 비동기 작업
+```csharp
+public async Task<bool> ExecuteAsync(CancellationToken token = default)
+{
+    try
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, cts.Token);
+        
+        return await Task.Run(async () =>
+        {
+            // 작업 수행
+        }, linked.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        _logger.LogWarning("작업 취소됨");
+        return false;
+    }
+}
+```
+
+### 데이터 검증
+```csharp
+public void ValidateData(string input)
+{
+    if (string.IsNullOrEmpty(input))
+        throw new ArgumentException("입력값이 필요합니다.");
+        
+    if (input.Length > 100)
+        throw new ArgumentException("입력값이 너무 깁니다.");
+}
+```
+
+## 3. UI 오류 방지
+
+### 데이터 바인딩
+```xaml
+<TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, 
+                ValidatesOnDataErrors=True}"/>
+```
+
+### 이벤트 처리
+```csharp
+private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
+{
+    if (e.PropertyName == nameof(IsLoading))
+    {
+        // UI 업데이트
+        Dispatcher.Invoke(() =>
+        {
+            LoadingIndicator.Visibility = IsLoading ? 
+                Visibility.Visible : Visibility.Collapsed;
+        });
+    }
+}
+```
+
+### 리소스 관리
+```csharp
+public partial class MainWindow : Window, IDisposable
+{
+    private bool _disposed;
+    
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+        
+        if (disposing)
+        {
+            // 리소스 해제
+        }
+        
+        _disposed = true;
+    }
+    
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+}
+```
+
+## 4. 성능 최적화
+
+### 메모리 관리
+- 큰 객체 즉시 해제
+- 캐시 크기 제한
+- 주기적 메모리 정리
+
+### UI 응답성
+- 긴 작업 비동기 처리
+- UI 스레드 부하 최소화
+- 데이터 가상화 사용
+
+### 리소스 사용
+- 이미지 최적화
+- 파일 핸들 관리
+- 네트워크 연결 관리
+
+## 5. 테스트
+
+### 단위 테스트
+```csharp
+[TestMethod]
+public async Task VoiceRecognition_ShouldSucceed()
+{
+    // Arrange
+    var service = new VoiceRecognitionService();
+    
+    // Act
+    var result = await service.StartRecognitionAsync();
+    
+    // Assert
+    Assert.IsTrue(result.Success);
+}
+```
+
+### 통합 테스트
+```csharp
+[TestMethod]
+public async Task EndToEnd_ShouldWork()
+{
+    // 전체 시스템 테스트
+    using var app = new TestApplication();
+    await app.StartAsync();
+    
+    // 테스트 수행
+    var result = await app.ExecuteCommandAsync("테스트");
+    
+    // 검증
+    Assert.IsTrue(result.Success);
+}
+```
+
+## 6. 로깅
+
+### 오류 로깅
+```csharp
+public class LoggingService : ILoggingService
+{
+    private readonly ILogger _logger;
+    
+    public void LogError(Exception ex, string message)
+    {
+        _logger.LogError(ex, "{Message}: {ErrorMessage}", 
+            message, ex.Message);
+    }
+}
+```
+
+### 성능 로깅
+```csharp
+public async Task MeasurePerformance(Func<Task> action)
+{
+    var sw = Stopwatch.StartNew();
+    try
+    {
+        await action();
+    }
+    finally
+    {
+        sw.Stop();
+        _logger.LogInformation("작업 소요시간: {Elapsed}ms", 
+            sw.ElapsedMilliseconds);
+    }
+}
+```
+
+## 7. 보안
+
+### 데이터 보안
+- 민감 정보 암호화
+- 안전한 저장소 사용
+- 접근 권한 확인
+
+### 입력 검증
+- 모든 사용자 입력 검증
+- SQL 인젝션 방지
+- XSS 공격 방지
+
+## 8. 배포
+
+### 배포 전 체크리스트
+1. 모든 테스트 통과
+2. 리소스 파일 포함
+3. 설정 파일 확인
+4. 의존성 해결
+
+### 롤백 계획
+1. 이전 버전 백업
+2. 복구 절차 문서화
+3. 긴급 연락망 준비
