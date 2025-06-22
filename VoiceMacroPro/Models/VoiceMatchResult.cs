@@ -1,5 +1,5 @@
+using System;
 using System.ComponentModel;
-using System.Windows.Media;
 
 namespace VoiceMacroPro.Models
 {
@@ -7,7 +7,7 @@ namespace VoiceMacroPro.Models
     /// 음성 인식 매칭 결과를 나타내는 모델 클래스
     /// UI의 매칭 결과 DataGrid에 바인딩되는 데이터를 담습니다.
     /// </summary>
-    public class VoiceMatchResult : INotifyPropertyChanged
+    public class VoiceMatchResultModel : INotifyPropertyChanged
     {
         private int _rank;
         private string _macroName = string.Empty;
@@ -17,6 +17,14 @@ namespace VoiceMacroPro.Models
         private int _macroId;
         private string _recognizedText = string.Empty;
         private bool _isExecuted;
+        private string _inputText = string.Empty;
+        private double _similarity;
+        private bool _isExecuting;
+        private bool _isSuccess;
+        private DateTime _executionStartTime;
+        private DateTime _executionEndTime;
+        private TimeSpan _executionTime;
+        private string _errorMessage = string.Empty;
 
         /// <summary>
         /// 매칭 순위 (1, 2, 3, ...)
@@ -80,16 +88,16 @@ namespace VoiceMacroPro.Models
         /// <summary>
         /// 확신도에 따른 색상 (높음: 초록, 중간: 노랑, 낮음: 빨강)
         /// </summary>
-        public Brush ConfidenceColor
+        public System.Windows.Media.Brush ConfidenceColor
         {
             get
             {
                 if (Confidence >= 0.8)
-                    return new SolidColorBrush(Colors.Green);
+                    return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green);
                 else if (Confidence >= 0.5)
-                    return new SolidColorBrush(Colors.Orange);
+                    return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Orange);
                 else
-                    return new SolidColorBrush(Colors.Red);
+                    return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
             }
         }
 
@@ -158,14 +166,122 @@ namespace VoiceMacroPro.Models
         public string ExecutionStatusColor => IsExecuted ? "#4CAF50" : "#FF9800";
 
         /// <summary>
-        /// 프로퍼티 변경 이벤트
+        /// 입력된 텍스트
+        /// </summary>
+        public string InputText
+        {
+            get => _inputText;
+            set
+            {
+                _inputText = value;
+                OnPropertyChanged(nameof(InputText));
+            }
+        }
+
+        /// <summary>
+        /// 유사도 점수
+        /// </summary>
+        public double Similarity
+        {
+            get => _similarity;
+            set
+            {
+                _similarity = value;
+                OnPropertyChanged(nameof(Similarity));
+            }
+        }
+
+        /// <summary>
+        /// 실행 중 여부
+        /// </summary>
+        public bool IsExecuting
+        {
+            get => _isExecuting;
+            set
+            {
+                _isExecuting = value;
+                OnPropertyChanged(nameof(IsExecuting));
+            }
+        }
+
+        /// <summary>
+        /// 실행 성공 여부
+        /// </summary>
+        public bool IsSuccess
+        {
+            get => _isSuccess;
+            set
+            {
+                _isSuccess = value;
+                OnPropertyChanged(nameof(IsSuccess));
+            }
+        }
+
+        /// <summary>
+        /// 실행 시작 시간
+        /// </summary>
+        public DateTime ExecutionStartTime
+        {
+            get => _executionStartTime;
+            set
+            {
+                _executionStartTime = value;
+                OnPropertyChanged(nameof(ExecutionStartTime));
+            }
+        }
+
+        /// <summary>
+        /// 실행 종료 시간
+        /// </summary>
+        public DateTime ExecutionEndTime
+        {
+            get => _executionEndTime;
+            set
+            {
+                _executionEndTime = value;
+                OnPropertyChanged(nameof(ExecutionEndTime));
+                if (_executionStartTime != default)
+                {
+                    ExecutionTime = _executionEndTime - _executionStartTime;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 실행 소요 시간
+        /// </summary>
+        public TimeSpan ExecutionTime
+        {
+            get => _executionTime;
+            set
+            {
+                _executionTime = value;
+                OnPropertyChanged(nameof(ExecutionTime));
+            }
+        }
+
+        /// <summary>
+        /// 오류 메시지
+        /// </summary>
+        public string ErrorMessage
+        {
+            get => _errorMessage;
+            set
+            {
+                _errorMessage = value;
+                OnPropertyChanged(nameof(ErrorMessage));
+            }
+        }
+
+        /// <summary>
+        /// 속성 변경 이벤트
         /// </summary>
         public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
-        /// 프로퍼티 변경 알림을 발생시키는 헬퍼 메서드
+        /// 속성 변경을 알리는 메서드
         /// </summary>
-        /// <param name="propertyName">변경된 프로퍼티 이름</param>
+        /// <param name="propertyName">변경된 속성 이름</param>
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

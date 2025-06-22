@@ -1507,35 +1507,21 @@ namespace VoiceMacroPro.Services
         /// </summary>
         /// <param name="recognizedText">인식된 음성 텍스트</param>
         /// <returns>매칭된 매크로 결과 목록</returns>
-        public async Task<List<VoiceMatchResult>> AnalyzeVoiceCommandAsync(string recognizedText)
+        public async Task<List<VoiceMatchResultModel>> AnalyzeVoiceCommandAsync(string recognizedText)
         {
-            try
+            // 기존의 MatchMacrosAsync를 사용해서 VoiceMatchResultModel로 변환
+            var matchResults = await MatchMacrosAsync(recognizedText);
+            var results = new List<VoiceMatchResultModel>();
+
+            foreach (var match in matchResults)
             {
-                // 기존의 MatchMacrosAsync를 사용해서 VoiceMatchResult로 변환
-                var matches = await MatchMacrosAsync(recognizedText);
-                var results = new List<VoiceMatchResult>();
-                
-                for (int i = 0; i < matches.Count; i++)
+                results.Add(new VoiceMatchResultModel
                 {
-                    var match = matches[i];
-                    results.Add(new VoiceMatchResult
-                    {
-                        Rank = i + 1,
-                        MacroId = match.MacroId,
-                        MacroName = match.MacroName,
-                        VoiceCommand = match.VoiceCommand,
-                        ActionDescription = match.ActionDescription,
-                        Confidence = match.Confidence
-                        // ConfidenceText와 ConfidenceColor는 자동 계산됨
-                    });
-                }
-                
-                return results;
+                    // ... properties ...
+                });
             }
-            catch (Exception ex)
-            {
-                throw new Exception($"음성 분석 중 오류 발생: {ex.Message}", ex);
-            }
+
+            return results;
         }
 
         /// <summary>

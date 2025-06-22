@@ -19,7 +19,7 @@ namespace VoiceMacroPro.Views
     /// GPT-4o 실시간 음성인식을 위한 View 클래스
     /// WebSocket 기반 실시간 트랜스크립션, 매크로 매칭, 결과 표시 기능을 포함합니다.
     /// </summary>
-    public partial class VoiceRecognitionView : UserControl, INotifyPropertyChanged
+    public partial class VoiceRecognitionView : System.Windows.Controls.UserControl, INotifyPropertyChanged
     {
         #region 서비스 의존성
         private readonly ApiService _apiService;
@@ -46,8 +46,8 @@ namespace VoiceMacroPro.Views
         /// <summary>
         /// 매크로 실행 결과를 저장하는 컬렉션
         /// </summary>
-        private ObservableCollection<VoiceMatchResult> _macroResults;
-        public ObservableCollection<VoiceMatchResult> MacroResults
+        private ObservableCollection<VoiceMatchResultModel> _macroResults;
+        public ObservableCollection<VoiceMatchResultModel> MacroResults
         {
             get => _macroResults;
             set
@@ -95,13 +95,13 @@ namespace VoiceMacroPro.Views
         /// <summary>
         /// 신뢰도에 따른 색상 (높음: 녹색, 중간: 주황색, 낮음: 빨간색)
         /// </summary>
-        public Brush ConfidenceColor
+        public System.Windows.Media.Brush ConfidenceColor
         {
             get
             {
-                if (CurrentConfidence >= 0.8) return Brushes.Green;
-                if (CurrentConfidence >= 0.6) return Brushes.Orange;
-                return Brushes.Red;
+                if (CurrentConfidence >= 0.8) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green);
+                if (CurrentConfidence >= 0.6) return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Orange);
+                return new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
             }
         }
         #endregion
@@ -111,16 +111,14 @@ namespace VoiceMacroPro.Views
         /// <summary>
         /// WebSocket 연결 상태
         /// </summary>
-        private bool _isConnected = false;
-        public bool IsConnected
+        private ConnectionStatus _connectionStatus = ConnectionStatus.Disconnected;
+        public ConnectionStatus ConnectionStatus
         {
-            get => _isConnected;
+            get => _connectionStatus;
             set
             {
-                _isConnected = value;
-                OnPropertyChanged(nameof(IsConnected));
-                OnPropertyChanged(nameof(ConnectionStatusText));
-                OnPropertyChanged(nameof(ConnectionStatusColor));
+                _connectionStatus = value;
+                OnPropertyChanged(nameof(ConnectionStatus));
             }
         }
 
@@ -143,12 +141,14 @@ namespace VoiceMacroPro.Views
         /// <summary>
         /// 연결 상태 텍스트
         /// </summary>
-        public string ConnectionStatusText => IsConnected ? "연결됨" : "연결 해제됨";
+        public string ConnectionStatusText => ConnectionStatus == ConnectionStatus.Connected ? "연결됨" : "연결 해제됨";
 
         /// <summary>
         /// 연결 상태 색상
         /// </summary>
-        public Brush ConnectionStatusColor => IsConnected ? Brushes.Green : Brushes.Red;
+        public System.Windows.Media.Brush ConnectionStatusColor => ConnectionStatus == ConnectionStatus.Connected ? 
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green) : 
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
 
         /// <summary>
         /// 녹음 상태 텍스트
@@ -276,7 +276,7 @@ namespace VoiceMacroPro.Views
                 
                 // 컬렉션 초기화
                 TranscriptionResults = new ObservableCollection<TranscriptionResult>();
-                MacroResults = new ObservableCollection<VoiceMatchResult>();
+                MacroResults = new ObservableCollection<VoiceMatchResultModel>();
                 CurrentSession = new VoiceSession();
                 
                 // 데이터 컨텍스트 설정
@@ -401,7 +401,7 @@ namespace VoiceMacroPro.Views
         /// <summary>
         /// 매크로 실행 결과를 처리하는 이벤트 핸들러
         /// </summary>
-        private void OnMacroExecuted(object sender, VoiceMatchResult result)
+        private void OnMacroExecuted(object sender, VoiceMatchResultModel result)
         {
             Dispatcher.Invoke(() =>
             {
@@ -443,10 +443,19 @@ namespace VoiceMacroPro.Views
         /// </summary>
         private void OnConnectionChanged(object sender, ConnectionStatus status)
         {
-            Dispatcher.Invoke(() =>
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
-                IsConnected = status.IsConnected;
-                _loggingService.LogInfo($"연결 상태 변경: {status.Status}");
+                ConnectionStatus = status;
+                SetUIButtonsEnabled(status == ConnectionStatus.Connected);
+                
+                if (status == ConnectionStatus.Connected)
+                {
+                    _loggingService.LogInfo("✅ GPT-4o 음성인식 서비스에 연결됨");
+                }
+                else if (status == ConnectionStatus.Error)
+                {
+                    _loggingService.LogError("❌ GPT-4o 음성인식 서비스 연결 오류");
+                }
             });
         }
 
@@ -618,7 +627,7 @@ namespace VoiceMacroPro.Views
             {
                 _loggingService.LogInfo("🎤 마이크 테스트 시작");
 
-                if (!IsConnected)
+                if (!IsRecording)
                 {
                     UIHelper.ShowWarning("먼저 GPT-4o 서비스에 연결해주세요.");
                     return;

@@ -2,7 +2,6 @@ using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
-using System.Windows.Media;
 
 namespace VoiceMacroPro.Utils
 {
@@ -112,9 +111,11 @@ namespace VoiceMacroPro.Utils
         /// </summary>
         /// <param name="isConnected">연결 상태</param>
         /// <returns>연결 상태에 맞는 색상 브러시</returns>
-        public static Brush GetConnectionStatusColor(bool isConnected)
+        public static System.Windows.Media.Brush GetConnectionStatusColor(bool isConnected)
         {
-            return isConnected ? Brushes.Green : Brushes.Red;
+            return isConnected ? 
+                new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green) : 
+                new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
         }
 
         /// <summary>
@@ -242,7 +243,7 @@ namespace VoiceMacroPro.Utils
         /// </summary>
         /// <param name="control">상태를 변경할 컨트롤</param>
         /// <param name="isEnabled">활성화 여부</param>
-        public static void SetControlEnabled(FrameworkElement control, bool isEnabled)
+        public static void SetControlEnabled(System.Windows.FrameworkElement control, bool isEnabled)
         {
             if (control.Dispatcher.CheckAccess())
             {
@@ -264,11 +265,18 @@ namespace VoiceMacroPro.Utils
         {
             // 실제 구현은 메인 윈도우의 로딩 패널을 제어
             // 여기서는 기본 구조만 제시
-            Application.Current.Dispatcher.Invoke(() =>
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
                 // 로딩 상태에 따른 UI 업데이트 로직
                 // 예: 로딩 스피너 표시/숨김, 버튼 비활성화 등
             });
+        }
+
+        public static System.Windows.Media.Brush GetStatusBrush(bool isActive)
+        {
+            return isActive ? 
+                new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Green) : 
+                new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Red);
         }
     }
 
@@ -306,14 +314,14 @@ namespace VoiceMacroPro.Utils
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is bool boolValue)
-                return boolValue ? Visibility.Visible : Visibility.Collapsed;
-            return Visibility.Collapsed;
+                return boolValue ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
+            return System.Windows.Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is Visibility visibility)
-                return visibility == Visibility.Visible;
+            if (value is System.Windows.Visibility visibility)
+                return visibility == System.Windows.Visibility.Visible;
             return false;
         }
     }

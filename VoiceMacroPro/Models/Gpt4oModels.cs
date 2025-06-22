@@ -277,7 +277,7 @@ namespace VoiceMacroPro.Models
     }
 
     /// <summary>
-    /// 확장된 VoiceMatchResult (매크로 실행 결과용)
+    /// 음성 매칭 결과
     /// </summary>
     public class VoiceMatchResult
     {
@@ -297,20 +297,5 @@ namespace VoiceMacroPro.Models
         public bool IsExecuted => IsSuccess;
         public string MatchedCommand => InputText;
         public DateTime Timestamp => ExecutionStartTime != default ? ExecutionStartTime : DateTime.Now;
-    }
-
-    /// <summary>
-    /// 향상된 연결 상태 정보
-    /// </summary>
-    public class ConnectionStatus
-    {
-        public bool IsConnected { get; set; }
-        public string Status { get; set; } = string.Empty;
-        public DateTime LastConnectionAttempt { get; set; }
-        public string ErrorMessage { get; set; } = string.Empty;
-        public int ReconnectAttempts { get; set; }
-        public TimeSpan ConnectionUptime { get; set; }
-        public string ServerVersion { get; set; } = string.Empty;
-        public string[] SupportedFeatures { get; set; } = Array.Empty<string>();
     }
 } 

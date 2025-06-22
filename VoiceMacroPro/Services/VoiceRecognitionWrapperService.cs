@@ -15,8 +15,8 @@ namespace VoiceMacroPro.Services
     /// </summary>
     public class VoiceRecognitionWrapperService : IDisposable
     {
-        private SocketIOClient.SocketIO _socket;
-        private WaveInEvent _waveIn;
+        private SocketIO? _socket;
+        private WaveIn? _waveIn;
         private bool _isRecording = false;
         private bool _isInitialized = false;
         private readonly string _serverUrl;
@@ -24,32 +24,34 @@ namespace VoiceMacroPro.Services
         private readonly AudioCaptureSettings _audioSettings;
         private VoiceSession _currentSession;
         private readonly List<TranscriptionResult> _sessionHistory;
+        private readonly object _lock = new();
+        private bool _isDisposed;
 
         #region 이벤트 정의
         /// <summary>
         /// 트랜스크립션 결과를 받을 때 발생하는 이벤트
         /// </summary>
-        public event EventHandler<TranscriptionResult> TranscriptionReceived;
+        public event EventHandler<TranscriptionResult>? TranscriptionReceived;
 
         /// <summary>
         /// 에러 발생 시 발생하는 이벤트
         /// </summary>
-        public event EventHandler<string> ErrorOccurred;
+        public event EventHandler<string>? ErrorOccurred;
 
         /// <summary>
         /// 연결 상태 변경 시 발생하는 이벤트
         /// </summary>
-        public event EventHandler<ConnectionStatus> ConnectionChanged;
+        public event EventHandler<ConnectionStatus>? ConnectionChanged;
 
         /// <summary>
         /// 매크로 실행 결과를 받을 때 발생하는 이벤트
         /// </summary>
-        public event EventHandler<VoiceMatchResult> MacroExecuted;
+        public event EventHandler<VoiceMatchResultModel>? MacroExecuted;
 
         /// <summary>
         /// 오디오 레벨 변경 시 발생하는 이벤트 (음성 입력 시각화용)
         /// </summary>
-        public event EventHandler<double> AudioLevelChanged;
+        public event EventHandler<double>? AudioLevelChanged;
         #endregion
 
         /// <summary>
@@ -63,6 +65,7 @@ namespace VoiceMacroPro.Services
             _audioSettings = new AudioCaptureSettings(); // GPT-4o 최적화 설정
             _sessionHistory = new List<TranscriptionResult>();
             _currentSession = new VoiceSession();
+            InitializeAudioCapture();
         }
 
         /// <summary>
@@ -77,7 +80,7 @@ namespace VoiceMacroPro.Services
                 _loggingService.LogInfo("GPT-4o 음성인식 서비스 초기화 시작");
 
                 // WebSocket 클라이언트 초기화
-                _socket = new SocketIOClient.SocketIO(_serverUrl);
+                _socket = new SocketIO(_serverUrl);
 
                 // WebSocket 이벤트 핸들러 등록
                 SetupSocketEventHandlers();
@@ -100,12 +103,7 @@ namespace VoiceMacroPro.Services
                 _isInitialized = true;
                 
                 // 연결 상태 이벤트 발생
-                ConnectionChanged?.Invoke(this, new ConnectionStatus 
-                { 
-                    IsConnected = true, 
-                    Status = "연결됨",
-                    LastConnectionAttempt = DateTime.Now
-                });
+                ConnectionChanged?.Invoke(this, ConnectionStatus.Connected);
 
                 _loggingService.LogInfo("GPT-4o 음성인식 서비스 초기화 완료");
                 return true;
@@ -125,16 +123,53 @@ namespace VoiceMacroPro.Services
         private void SetupSocketEventHandlers()
         {
             // 연결 확인 이벤트 수신
-            _socket.On("connection_established", HandleConnectionEstablished);
+            _socket.OnConnected += (sender, e) =>
+            {
+                _loggingService.LogInfo("✅ Socket.IO 서버에 연결됨");
+                ConnectionChanged?.Invoke(this, ConnectionStatus.Connected);
+            };
+
+            // 서버 연결 해제 이벤트
+            _socket.OnDisconnected += (sender, e) =>
+            {
+                _loggingService.LogWarning("❌ Socket.IO 서버 연결 해제됨");
+                ConnectionChanged?.Invoke(this, ConnectionStatus.Disconnected);
+            };
+
+            // 연결 오류 이벤트
+            _socket.OnError += (sender, e) =>
+            {
+                _loggingService.LogError($"❌ Socket.IO 연결 오류: {e}");
+                ErrorOccurred?.Invoke(this, $"연결 오류: {e}");
+            };
 
             // 트랜스크립션 결과 수신
-            _socket.On("transcription_result", HandleTranscriptionResult);
+            _socket.On("transcription_result", response =>
+            {
+                try
+                {
+                    var result = response.GetValue<TranscriptionResult>();
+                    TranscriptionReceived?.Invoke(this, result);
+                }
+                catch (Exception ex)
+                {
+                    ErrorOccurred?.Invoke(this, $"트랜스크립션 결과 처리 오류: {ex.Message}");
+                }
+            });
 
-            // 매크로 실행 관련 이벤트들
-            _socket.On("macro_execution_started", HandleMacroExecutionStarted);
-            _socket.On("macro_execution_completed", HandleMacroExecutionCompleted);
-            _socket.On("macro_execution_failed", HandleMacroExecutionFailed);
-            _socket.On("macro_match_failed", HandleMacroMatchFailed);
+            // 매크로 실행 결과 수신
+            _socket.On("macro_executed", response =>
+            {
+                try
+                {
+                    var result = response.GetValue<VoiceMatchResultModel>();
+                    MacroExecuted?.Invoke(this, result);
+                }
+                catch (Exception ex)
+                {
+                    ErrorOccurred?.Invoke(this, $"매크로 실행 결과 처리 오류: {ex.Message}");
+                }
+            });
 
             // 음성인식 상태 이벤트들
             _socket.On("voice_recognition_started", HandleVoiceRecognitionStarted);
@@ -145,40 +180,6 @@ namespace VoiceMacroPro.Services
             _socket.On("audio_chunk_received", HandleAudioChunkReceived);
             _socket.On("audio_processing_error", HandleAudioProcessingError);
             _socket.On("transcription_error", HandleTranscriptionError);
-
-            // 핑/퐁 이벤트 (연결 상태 확인용)
-            _socket.On("pong", HandlePong);
-
-            // 서버 연결 이벤트
-            _socket.OnConnected += (sender, e) =>
-            {
-                _loggingService.LogInfo("✅ Socket.IO 서버에 연결됨");
-                ConnectionChanged?.Invoke(this, new ConnectionStatus 
-                { 
-                    IsConnected = true, 
-                    Status = "연결됨",
-                    LastConnectionAttempt = DateTime.Now
-                });
-            };
-
-            // 서버 연결 해제 이벤트
-            _socket.OnDisconnected += (sender, e) =>
-            {
-                _loggingService.LogWarning("❌ Socket.IO 서버 연결 해제됨");
-                ConnectionChanged?.Invoke(this, new ConnectionStatus 
-                { 
-                    IsConnected = false, 
-                    Status = "연결 해제됨",
-                    LastConnectionAttempt = DateTime.Now
-                });
-            };
-
-            // 연결 오류 이벤트
-            _socket.OnError += (sender, e) =>
-            {
-                _loggingService.LogError($"🚨 Socket.IO 연결 오류: {e}");
-                ErrorOccurred?.Invoke(this, $"연결 오류: {e}");
-            };
         }
 
         /// <summary>
@@ -192,7 +193,10 @@ namespace VoiceMacroPro.Services
                 // 윈도우 기본 마이크 장치 정보 로깅
                 LogAvailableAudioDevices();
 
-                _waveIn = new WaveInEvent();
+                _waveIn = new WaveIn
+                {
+                    WaveFormat = new WaveFormat(16000, 1)
+                };
                 
                 // 윈도우 기본 마이크 장치 설정 (DeviceNumber -1은 시스템 기본 장치)
                 _waveIn.DeviceNumber = -1;  // 윈도우 기본 마이크 사용
@@ -295,7 +299,7 @@ namespace VoiceMacroPro.Services
         /// <param name="e">오디오 데이터 이벤트 인자</param>
         private async void OnAudioDataAvailable(object sender, WaveInEventArgs e)
         {
-            if (_isRecording && _socket.Connected)
+            if (_isRecording && _socket != null && _socket.Connected)
             {
                 try
                 {
@@ -408,27 +412,6 @@ namespace VoiceMacroPro.Services
         #region WebSocket 이벤트 핸들러들
 
         /// <summary>
-        /// 서버 연결 확인 이벤트 핸들러
-        /// </summary>
-        private void HandleConnectionEstablished(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<ConnectionEstablishedData>();
-                _loggingService.LogInfo($"🎉 서버 연결 확인: {data.message}");
-                _loggingService.LogInfo($"📱 세션 ID: {data.session_id}");
-                _loggingService.LogInfo($"🛠️ 지원 기능: {string.Join(", ", data.features)}");
-
-                _currentSession.SessionId = data.session_id;
-                _currentSession.StartTime = DateTime.Parse(data.server_time);
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"연결 확인 처리 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// 음성인식 시작 확인 이벤트 핸들러
         /// </summary>
         private void HandleVoiceRecognitionStarted(SocketIOResponse response)
@@ -525,161 +508,6 @@ namespace VoiceMacroPro.Services
             catch (Exception ex)
             {
                 _loggingService.LogError($"트랜스크립션 오류 핸들러 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 매크로 실행 시작 이벤트 핸들러
-        /// </summary>
-        private void HandleMacroExecutionStarted(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<MacroExecutionStartedData>();
-                _loggingService.LogInfo($"🚀 매크로 실행 시작: {data.macro_name} (유사도: {data.similarity:F2})");
-                
-                // 매크로 실행 시작 이벤트 발생
-                MacroExecuted?.Invoke(this, new VoiceMatchResult
-                {
-                    MacroId = data.macro_id,
-                    MacroName = data.macro_name,
-                    InputText = data.input_text,
-                    Confidence = data.confidence,
-                    Similarity = data.similarity,
-                    IsExecuting = true,
-                    ExecutionStartTime = DateTime.Parse(data.timestamp)
-                });
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 실행 시작 처리 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 매크로 실행 완료 이벤트 핸들러
-        /// </summary>
-        private void HandleMacroExecutionCompleted(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<MacroExecutionCompletedData>();
-                _loggingService.LogInfo($"✅ 매크로 실행 완료: {data.macro_name} ({data.execution_time}ms)");
-                
-                // 매크로 실행 완료 이벤트 발생
-                MacroExecuted?.Invoke(this, new VoiceMatchResult
-                {
-                    MacroId = data.macro_id,
-                    MacroName = data.macro_name,
-                    IsExecuting = false,
-                    IsSuccess = data.success,
-                    ExecutionTime = data.execution_time,
-                    ExecutionEndTime = DateTime.Parse(data.timestamp)
-                });
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 실행 완료 처리 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 매크로 실행 실패 이벤트 핸들러
-        /// </summary>
-        private void HandleMacroExecutionFailed(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<MacroExecutionFailedData>();
-                _loggingService.LogError($"❌ 매크로 실행 실패: {data.macro_name} - {data.error}");
-                
-                // 매크로 실행 실패 이벤트 발생
-                MacroExecuted?.Invoke(this, new VoiceMatchResult
-                {
-                    MacroId = data.macro_id,
-                    MacroName = data.macro_name,
-                    IsExecuting = false,
-                    IsSuccess = false,
-                    ErrorMessage = data.error,
-                    ExecutionEndTime = DateTime.Parse(data.timestamp)
-                });
-                
-                ErrorOccurred?.Invoke(this, $"매크로 실행 실패: {data.macro_name} - {data.error}");
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 실행 실패 처리 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 매크로 매칭 실패 이벤트 핸들러
-        /// </summary>
-        private void HandleMacroMatchFailed(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<MacroMatchFailedData>();
-                _loggingService.LogWarning($"❓ 매크로 매칭 실패: '{data.input_text}' - {data.message}");
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"매크로 매칭 실패 처리 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 핑 응답 이벤트 핸들러
-        /// </summary>
-        private void HandlePong(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<PongData>();
-                _currentSession.LastActivity = DateTime.Parse(data.server_time);
-                // 핑 로그는 스팸 방지를 위해 생략
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"핑 응답 처리 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 트랜스크립션 결과를 처리하는 함수
-        /// GPT-4o에서 받은 음성 인식 결과를 UI에 전달합니다.
-        /// </summary>
-        /// <param name="response">WebSocket 응답</param>
-        private void HandleTranscriptionResult(SocketIOResponse response)
-        {
-            try
-            {
-                var data = response.GetValue<TranscriptionData>();
-                
-                var result = new TranscriptionResult
-                {
-                    Type = data.type,
-                    Text = data.text,
-                    Confidence = data.confidence,
-                    Timestamp = DateTime.Parse(data.timestamp)
-                };
-
-                // 세션 통계 업데이트
-                if (result.Type == "final")
-                {
-                    _currentSession.TranscriptionCount++;
-                    _sessionHistory.Add(result);
-                }
-
-                // UI에 트랜스크립션 결과 전달
-                TranscriptionReceived?.Invoke(this, result);
-                
-                _loggingService.LogInfo($"트랜스크립션 결과: '{result.Text}' (신뢰도: {result.Confidence:F2})");
-            }
-            catch (Exception ex)
-            {
-                _loggingService.LogError($"트랜스크립션 결과 처리 오류: {ex.Message}");
-                ErrorOccurred?.Invoke(this, $"트랜스크립션 결과 처리 오류: {ex.Message}");
             }
         }
 

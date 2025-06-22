@@ -8,7 +8,7 @@ namespace VoiceMacroPro
     /// VoiceMacro Pro 애플리케이션의 메인 클래스
     /// 애플리케이션의 시작과 종료를 관리합니다.
     /// </summary>
-    public partial class App : Application
+    public partial class App : System.Windows.Application
     {
         // 콘솔 창을 할당하기 위한 Win32 API
         [DllImport("kernel32.dll", SetLastError = true)]
