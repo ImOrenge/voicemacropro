@@ -10,26 +10,11 @@ from unittest.mock import MagicMock, patch
 import sys
 import json
 
-# 프로젝트 루트 디렉토리를 Python 경로에 추가 (수정)
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, project_root)
-sys.path.insert(0, os.path.join(project_root, 'backend'))
+# 프로젝트 루트 디렉토리를 Python 경로에 추가
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# import 오류 해결을 위한 직접 import
-try:
-    from backend.services.gpt4o_transcription_service import GPT4oTranscriptionService
-    from backend.utils.config import Config
-except ImportError:
-    try:
-        # 대안 경로로 시도
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from services.gpt4o_transcription_service import GPT4oTranscriptionService
-        from utils.config import Config
-    except ImportError as e:
-        print(f"❌ 모듈 import 실패: {e}")
-        print("📁 현재 작업 디렉토리:", os.getcwd())
-        print("🐍 Python 경로:", sys.path[:3])
-        sys.exit(1)
+from services.gpt4o_transcription_service import GPT4oTranscriptionService
+from utils.config import Config
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -43,13 +28,6 @@ class GPT4oServiceTester:
         """테스터 초기화"""
         self.test_results = []
         self.api_key = os.getenv('OPENAI_API_KEY')
-        
-        # API 키 확인
-        if not self.api_key:
-            print("⚠️ OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
-            print("🔧 설정 방법:")
-            print("   PowerShell: $env:OPENAI_API_KEY = 'your_api_key_here'")
-            print("   또는 .env 파일에 OPENAI_API_KEY=your_api_key_here 추가")
         
     def log_test_result(self, test_name: str, success: bool, message: str = ""):
         """테스트 결과 로깅"""
@@ -189,27 +167,6 @@ class GPT4oServiceTester:
         except Exception as e:
             self.log_test_result("WebSocket 연결 시뮬레이션", False, f"예외 발생: {e}")
     
-    async def test_actual_websocket_connection(self):
-        """실제 WebSocket 연결 테스트 (API 키가 있는 경우)"""
-        if not self.api_key:
-            self.log_test_result("실제 WebSocket 연결", False, "API 키 없음")
-            return
-            
-        try:
-            service = GPT4oTranscriptionService(self.api_key)
-            
-            print("🔄 GPT-4o API 연결 시도 중...")
-            connected = await service.connect()
-            
-            if connected:
-                self.log_test_result("실제 WebSocket 연결", True, "연결 성공")
-                await service.disconnect()
-            else:
-                self.log_test_result("실제 WebSocket 연결", False, "연결 실패")
-                
-        except Exception as e:
-            self.log_test_result("실제 WebSocket 연결", False, f"연결 예외: {e}")
-    
     async def run_all_tests(self):
         """모든 테스트 실행"""
         print("🚀 GPT-4o 트랜스크립션 서비스 테스트 시작")
@@ -222,10 +179,6 @@ class GPT4oServiceTester:
         await self.test_confidence_calculation()
         await self.test_callback_setting()
         await self.test_websocket_connection_simulation()
-        
-        # API 키가 있는 경우 실제 연결 테스트
-        if self.api_key:
-            await self.test_actual_websocket_connection()
         
         # 결과 요약
         print("\n" + "=" * 60)
@@ -272,21 +225,6 @@ class GPT4oServiceTester:
 
 async def main():
     """메인 테스트 실행 함수"""
-    print("🔧 환경 설정 확인")
-    print("-" * 40)
-    
-    # 환경변수 확인
-    api_key = os.getenv('OPENAI_API_KEY')
-    if api_key:
-        print(f"✅ OPENAI_API_KEY 설정됨 (길이: {len(api_key)}자)")
-    else:
-        print("❌ OPENAI_API_KEY 환경변수가 설정되지 않음")
-        print("🔧 설정 방법:")
-        print("   PowerShell: $env:OPENAI_API_KEY = 'your_api_key_here'")
-    
-    print(f"📁 현재 작업 디렉토리: {os.getcwd()}")
-    print()
-    
     tester = GPT4oServiceTester()
     success = await tester.run_all_tests()
     
@@ -298,12 +236,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    try:
-        # Config 검증 (가능한 경우)
-        if 'Config' in globals():
-            Config.validate_config()
-    except Exception as e:
-        print(f"⚠️ Config 검증 오류: {e}")
+    # Config 검증
+    Config.validate_config()
     
     # 테스트 실행
     asyncio.run(main()) 
