@@ -23,12 +23,16 @@ class Config:
     VOICE_RECOGNITION_TIMEOUT = int(os.getenv('VOICE_RECOGNITION_TIMEOUT', '30'))
     VOICE_RECOGNITION_MAX_FILE_SIZE = int(os.getenv('VOICE_RECOGNITION_MAX_FILE_SIZE', '25'))
     
-    # GPT-4o 실시간 트랜스크립션 설정
+    # GPT-4o 실시간 트랜스크립션 설정 (✅ 우선 사용)
     GPT4O_ENABLED = os.getenv('GPT4O_ENABLED', 'true').lower() == 'true'
+    GPT4O_PRIMARY = os.getenv('GPT4O_PRIMARY', 'true').lower() == 'true'  # ✅ GPT-4o 우선 사용
     GPT4O_CONFIDENCE_THRESHOLD = float(os.getenv('GPT4O_CONFIDENCE_THRESHOLD', '0.7'))
     GPT4O_VAD_THRESHOLD = float(os.getenv('GPT4O_VAD_THRESHOLD', '0.5'))
     GPT4O_NOISE_REDUCTION = os.getenv('GPT4O_NOISE_REDUCTION', 'near_field')
     GPT4O_BUFFER_SIZE_MS = int(os.getenv('GPT4O_BUFFER_SIZE_MS', '100'))
+    
+    # Whisper 설정 (폴백 용도)
+    WHISPER_FALLBACK_ENABLED = os.getenv('WHISPER_FALLBACK_ENABLED', 'true').lower() == 'true'
     
     # 오디오 설정
     SAMPLE_RATE = 16000  # Whisper 권장 샘플레이트

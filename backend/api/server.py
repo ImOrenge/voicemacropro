@@ -456,8 +456,8 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                 print(f"⚠️ 오디오 데이터가 너무 작음: {len(audio_bytes)} bytes")
                 return
             
-            # GPT-4o 서비스 우선 시도 (현재는 비활성화, Whisper로 직접 처리)
-            gpt4o_available = False  # 실제 GPT-4o 연결이 없으므로 비활성화
+            # GPT-4o 서비스 우선 시도 (✅ GPT-4o 활성화)
+            gpt4o_available = True  # ✅ GPT-4o를 기본으로 활성화
             
             if gpt4o_service and Config.GPT4O_ENABLED and gpt4o_available:
                 try:
@@ -472,21 +472,35 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                             # 공통 트랜스크립션 결과 처리 함수 호출
                             handle_transcription_result(text, confidence, 'GPT-4o')
                     
-                    # GPT-4o 실제 연결 확인
-                    if hasattr(gpt4o_service, 'is_connected') and gpt4o_service.is_connected:
-                        # 콜백 설정
-                        gpt4o_service.set_transcription_callback(handle_gpt4o_transcription)
+                    # ✅ GPT-4o 연결 및 사용 활성화
+                    print("🔄 GPT-4o 서비스 연결 확인 중...")
+                    
+                    # 비동기 루프에서 GPT-4o 연결 시도
+                    import asyncio
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    
+                    # GPT-4o 연결이 안되어 있으면 연결 시도
+                    if not gpt4o_service.is_connected:
+                        print("📡 GPT-4o 서비스 연결 시도...")
+                        connection_success = loop.run_until_complete(gpt4o_service.connect())
                         
-                        # 실제 GPT-4o 오디오 전송 (비동기)
-                        import asyncio
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
+                        if connection_success:
+                            print("✅ GPT-4o 서비스 연결 성공!")
+                            # 콜백 설정
+                            gpt4o_service.set_transcription_callback(handle_gpt4o_transcription)
+                        else:
+                            print("❌ GPT-4o 서비스 연결 실패")
+                            raise Exception("GPT-4o 서비스 연결 실패")
+                    
+                    # GPT-4o로 오디오 전송
+                    if gpt4o_service.is_connected:
+                        print("📤 GPT-4o로 오디오 데이터 전송 중...")
                         loop.run_until_complete(gpt4o_service.send_audio_chunk(audio_bytes))
-                        loop.close()
-                        
                         print("✅ GPT-4o 오디오 전송 완료")
-                        # GPT-4o 결과를 기다리지 않고 계속 진행 (비동기 처리)
-                        return  # GPT-4o 성공 시 Whisper 건너뛰기
+                        
+                        loop.close()
+                        return  # ✅ GPT-4o 성공 시 Whisper 건너뛰기
                     else:
                         raise Exception("GPT-4o 서비스가 연결되지 않음")
                     
