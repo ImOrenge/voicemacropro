@@ -11,7 +11,6 @@ import os
 import sqlite3
 from werkzeug.utils import secure_filename
 from datetime import datetime
-import time
 
 # 백엔드 패키지 임포트
 from backend.services.macro_service import macro_service
@@ -20,9 +19,7 @@ from backend.services.whisper_service import whisper_service
 from backend.services.macro_execution_service import macro_execution_service
 from backend.services.preset_service import preset_service
 from backend.services.custom_script_service import custom_script_service
-from backend.services.gpt4o_transcription_service import GPT4oTranscriptionService
 from backend.database.database_manager import DatabaseManager
-from backend.utils.config import Config
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__)
@@ -45,50 +42,9 @@ socketio = SocketIO(
 # 데이터베이스 설정
 db_path = "voice_macro.db"
 
-# GPT-4o 트랜스크립션 서비스 초기화
-gpt4o_service = None
-gpt4o_connection_status = {
-    'connected': False,
-    'last_attempt': None,
-    'error_message': None
-}
-
 # 연결된 클라이언트 세션 관리
 connected_clients = {}
 voice_sessions = {}
-
-def initialize_gpt4o_service():
-    """
-    GPT-4o 트랜스크립션 서비스를 초기화하는 함수
-    """
-    global gpt4o_service, gpt4o_connection_status
-    
-    try:
-        if Config.OPENAI_API_KEY and Config.GPT4O_ENABLED:
-            print("🔧 GPT-4o 트랜스크립션 서비스 초기화 시작...")
-            gpt4o_service = GPT4oTranscriptionService(Config.OPENAI_API_KEY)
-            
-            # 비동기 연결 시도는 실제 사용 시점에서 수행
-            gpt4o_connection_status.update({
-                'connected': False,
-                'last_attempt': datetime.now().isoformat(),
-                'error_message': None
-            })
-            
-            print("✅ GPT-4o 트랜스크립션 서비스 준비 완료")
-        else:
-            print("⚠️ GPT-4o 서비스가 비활성화되었습니다. (API 키 미설정 또는 기능 비활성화)")
-            
-    except Exception as e:
-        print(f"❌ GPT-4o 서비스 초기화 실패: {e}")
-        gpt4o_connection_status.update({
-            'connected': False,
-            'last_attempt': datetime.now().isoformat(),
-            'error_message': str(e)
-        })
-
-# 서버 시작 시 GPT-4o 서비스 초기화
-initialize_gpt4o_service()
 
 # Socket.IO 이벤트 핸들러
 @socketio.on('connect')
@@ -273,78 +229,14 @@ def handle_audio_chunk(data):
 
 def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
     """
-    오디오 데이터를 GPT-4o 또는 Whisper로 음성인식 처리하는 함수
+    오디오 데이터를 음성인식 처리를 위해 백그라운드에서 처리하는 함수
     
     Args:
         client_id (str): 클라이언트 세션 ID
         audio_bytes (bytes): 디코딩된 PCM 오디오 데이터
     """
     def run_transcription():
-        global gpt4o_service, gpt4o_connection_status
-        
         try:
-            # 오디오 파일 크기 체크 (최소 크기 확인)
-            if len(audio_bytes) < 1024:  # 1KB 미만이면 처리하지 않음
-                print(f"⚠️ 오디오 데이터가 너무 작음: {len(audio_bytes)} bytes")
-                return
-            
-            # GPT-4o 서비스 우선 시도
-            if gpt4o_service and Config.GPT4O_ENABLED:
-                try:
-                    print(f"🤖 GPT-4o 트랜스크립션 시도: {len(audio_bytes)} bytes")
-                    
-                    # GPT-4o 서비스로 직접 오디오 전송
-                    def handle_gpt4o_transcription(transcription_data):
-                        if transcription_data["type"] == "final":
-                            text = transcription_data["text"].strip()
-                            confidence = transcription_data["confidence"]
-                            
-                            if text and len(text) > 0:
-                                # 세션 통계 업데이트
-                                if client_id in voice_sessions:
-                                    voice_sessions[client_id]['transcription_count'] += 1
-                                
-                                print(f"📝 GPT-4o 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
-                                
-                                # 연결 상태 업데이트
-                                gpt4o_connection_status.update({
-                                    'connected': True,
-                                    'last_attempt': datetime.now().isoformat(),
-                                    'error_message': None
-                                })
-                                
-                                # 클라이언트에 트랜스크립션 결과 전송
-                                socketio.emit('transcription_result', {
-                                    'type': 'final',
-                                    'text': text,
-                                    'confidence': confidence,
-                                    'session_id': client_id,
-                                    'source': 'gpt4o',
-                                    'timestamp': datetime.now().isoformat()
-                                }, room=client_id)
-                                
-                                # 매크로 매칭 시도
-                                try_macro_matching(client_id, text, confidence)
-                    
-                    # GPT-4o 서비스에 콜백 설정 후 오디오 전송
-                    gpt4o_service.set_transcription_callback(handle_gpt4o_transcription)
-                    
-                    # 비동기적으로 오디오 전송 (실제 구현에서는 이미 연결된 상태에서 전송)
-                    # 여기서는 테스트를 위해 직접 결과 생성
-                    print("✅ GPT-4o 오디오 전송 완료")
-                    return
-                    
-                except Exception as gpt4o_error:
-                    print(f"⚠️ GPT-4o 처리 실패, Whisper로 폴백: {gpt4o_error}")
-                    gpt4o_connection_status.update({
-                        'connected': False,
-                        'last_attempt': datetime.now().isoformat(),
-                        'error_message': str(gpt4o_error)
-                    })
-            
-            # Whisper 폴백 처리
-            print(f"🎙️ Whisper 트랜스크립션 폴백 시작...")
-            
             # 임시 오디오 파일 저장 (Whisper 처리용)
             temp_audio_path = f"temp_audio/audio_{client_id}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.wav"
             
@@ -367,9 +259,14 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                     wav_file.setframerate(sample_rate)
                     wav_file.writeframes(audio_bytes)
                 
-                print(f"🎵 Whisper용 오디오 파일 저장: {temp_audio_path} ({len(audio_bytes)} bytes)")
+                print(f"🎵 오디오 파일 저장 완료: {temp_audio_path} ({len(audio_bytes)} bytes)")
                 
-                # Whisper를 사용한 음성인식
+                # 오디오 파일 크기 체크 (최소 크기 확인)
+                if len(audio_bytes) < 1024:  # 1KB 미만이면 처리하지 않음
+                    print(f"⚠️ 오디오 데이터가 너무 작음: {len(audio_bytes)} bytes")
+                    return
+                
+                # Whisper를 사용한 음성인식 (향후 GPT-4o로 교체 예정)
                 transcription_result = whisper_service.transcribe_audio(temp_audio_path)
                 
                 if transcription_result and transcription_result.get('success'):
@@ -381,7 +278,7 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                         if client_id in voice_sessions:
                             voice_sessions[client_id]['transcription_count'] += 1
                         
-                        print(f"📝 Whisper 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
+                        print(f"📝 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
                         
                         # 클라이언트에 트랜스크립션 결과 전송
                         socketio.emit('transcription_result', {
@@ -389,7 +286,6 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                             'text': text,
                             'confidence': confidence,
                             'session_id': client_id,
-                            'source': 'whisper',
                             'timestamp': datetime.now().isoformat()
                         }, room=client_id)
                         
@@ -398,7 +294,7 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                     else:
                         print("🔇 음성인식 결과가 비어있음")
                 else:
-                    print(f"❌ Whisper 음성인식 실패: {transcription_result}")
+                    print(f"❌ 음성인식 실패: {transcription_result}")
                 
             except Exception as audio_processing_error:
                 print(f"❌ 오디오 파일 처리 오류: {audio_processing_error}")
@@ -2474,231 +2370,6 @@ def run_server():
         print(f"❌ 서버 실행 오류: {e}")
     finally:
         print("✅ VoiceMacro Pro API 서버가 종료되었습니다.")
-
-# ========== GPT-4o 트랜스크립션 서비스 관리 API ==========
-
-@app.route('/api/gpt4o/status', methods=['GET'])
-def get_gpt4o_status():
-    """
-    GPT-4o 트랜스크립션 서비스의 현재 상태를 조회하는 API 엔드포인트
-    
-    Returns:
-        JSON: GPT-4o 서비스 상태 정보
-    """
-    global gpt4o_service, gpt4o_connection_status
-    
-    try:
-        status_info = {
-            'service_available': gpt4o_service is not None,
-            'enabled': Config.GPT4O_ENABLED if hasattr(Config, 'GPT4O_ENABLED') else False,
-            'api_key_configured': bool(Config.OPENAI_API_KEY) if hasattr(Config, 'OPENAI_API_KEY') else False,
-            'connection_status': gpt4o_connection_status.copy(),
-            'real_time_connected': gpt4o_service.is_connected if gpt4o_service else False,
-            'session_id': gpt4o_service.session_id if gpt4o_service else None,
-            'server_timestamp': datetime.now().isoformat()
-        }
-        
-        return jsonify({
-            'success': True,
-            'data': status_info,
-            'message': 'GPT-4o 서비스 상태 조회 성공'
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': 'GPT-4o 서비스 상태 조회 실패'
-        }), 500
-
-@app.route('/api/gpt4o/connect', methods=['POST'])
-def connect_gpt4o_service():
-    """
-    GPT-4o 트랜스크립션 서비스에 연결을 시도하는 API 엔드포인트
-    
-    Returns:
-        JSON: 연결 시도 결과
-    """
-    global gpt4o_service, gpt4o_connection_status
-    
-    try:
-        if not gpt4o_service:
-            return jsonify({
-                'success': False,
-                'message': 'GPT-4o 서비스가 초기화되지 않았습니다. API 키를 확인하세요.'
-            }), 400
-        
-        if gpt4o_service.is_connected:
-            return jsonify({
-                'success': True,
-                'message': 'GPT-4o 서비스가 이미 연결되어 있습니다.',
-                'data': {
-                    'session_id': gpt4o_service.session_id,
-                    'connected_at': gpt4o_connection_status.get('last_attempt')
-                }
-            }), 200
-        
-        # 비동기 연결 시도
-        def attempt_connection():
-            try:
-                print("🔄 실제 GPT-4o 서비스 연결 시도 중...")
-                
-                # 비동기 연결을 동기 컨텍스트에서 실행
-                async def async_connect():
-                    return await gpt4o_service.connect()
-                
-                # 새 이벤트 루프에서 연결 시도
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    connection_success = loop.run_until_complete(async_connect())
-                finally:
-                    loop.close()
-                
-                if connection_success:
-                    gpt4o_connection_status.update({
-                        'connected': True,
-                        'last_attempt': datetime.now().isoformat(),
-                        'error_message': None
-                    })
-                    print("✅ GPT-4o 서비스 실제 연결 성공!")
-                else:
-                    gpt4o_connection_status.update({
-                        'connected': False,
-                        'last_attempt': datetime.now().isoformat(),
-                        'error_message': "WebSocket 연결 실패"
-                    })
-                    print("❌ GPT-4o 서비스 연결 실패")
-                
-            except Exception as e:
-                gpt4o_connection_status.update({
-                    'connected': False,
-                    'last_attempt': datetime.now().isoformat(),
-                    'error_message': str(e)
-                })
-                print(f"❌ GPT-4o 서비스 연결 실패: {e}")
-        
-        # 백그라운드에서 연결 시도
-        threading.Thread(target=attempt_connection, daemon=True).start()
-        
-        return jsonify({
-            'success': True,
-            'message': 'GPT-4o 서비스 연결을 시도하고 있습니다.',
-            'data': {
-                'connection_attempt_started': datetime.now().isoformat()
-            }
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': 'GPT-4o 서비스 연결 시도 실패'
-        }), 500
-
-@app.route('/api/gpt4o/disconnect', methods=['POST'])
-def disconnect_gpt4o_service():
-    """
-    GPT-4o 트랜스크립션 서비스 연결을 해제하는 API 엔드포인트
-    
-    Returns:
-        JSON: 연결 해제 결과
-    """
-    global gpt4o_service, gpt4o_connection_status
-    
-    try:
-        if not gpt4o_service:
-            return jsonify({
-                'success': False,
-                'message': 'GPT-4o 서비스가 초기화되지 않았습니다.'
-            }), 400
-        
-        if not gpt4o_service.is_connected:
-            return jsonify({
-                'success': True,
-                'message': 'GPT-4o 서비스가 이미 연결 해제되어 있습니다.'
-            }), 200
-        
-        # 연결 해제 시도
-        def attempt_disconnect():
-            try:
-                # 실제로는 여기서 비동기 연결 해제를 수행해야 함
-                gpt4o_connection_status.update({
-                    'connected': False,
-                    'last_attempt': datetime.now().isoformat(),
-                    'error_message': None
-                })
-                
-                print("🔌 GPT-4o 서비스 연결 해제됨")
-                
-            except Exception as e:
-                print(f"❌ GPT-4o 서비스 연결 해제 실패: {e}")
-        
-        # 백그라운드에서 연결 해제
-        threading.Thread(target=attempt_disconnect, daemon=True).start()
-        
-        return jsonify({
-            'success': True,
-            'message': 'GPT-4o 서비스 연결이 해제되었습니다.'
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': 'GPT-4o 서비스 연결 해제 실패'
-        }), 500
-
-@app.route('/api/gpt4o/test', methods=['POST'])
-def test_gpt4o_connection():
-    """
-    GPT-4o 트랜스크립션 서비스 연결을 테스트하는 API 엔드포인트
-    
-    Returns:
-        JSON: 연결 테스트 결과
-    """
-    global gpt4o_service, gpt4o_connection_status
-    
-    try:
-        if not gpt4o_service:
-            return jsonify({
-                'success': False,
-                'message': 'GPT-4o 서비스가 초기화되지 않았습니다.',
-                'data': {
-                    'api_key_configured': bool(Config.OPENAI_API_KEY) if hasattr(Config, 'OPENAI_API_KEY') else False,
-                    'service_enabled': Config.GPT4O_ENABLED if hasattr(Config, 'GPT4O_ENABLED') else False
-                }
-            }), 400
-        
-        # 연결 테스트 수행
-        test_result = {
-            'api_key_valid': bool(Config.OPENAI_API_KEY),
-            'service_initialized': gpt4o_service is not None,
-            'current_connection_status': gpt4o_connection_status.copy(),
-            'websocket_ready': hasattr(gpt4o_service, 'ws'),
-            'session_active': gpt4o_service.session_id is not None if gpt4o_service else False,
-            'test_timestamp': datetime.now().isoformat()
-        }
-        
-        # 전체 상태 평가
-        all_systems_ready = (
-            test_result['api_key_valid'] and
-            test_result['service_initialized'] and
-            gpt4o_connection_status.get('connected', False)
-        )
-        
-        return jsonify({
-            'success': all_systems_ready,
-            'data': test_result,
-            'message': 'GPT-4o 연결 준비 완료' if all_systems_ready else 'GPT-4o 연결에 문제가 있습니다.'
-        }), 200 if all_systems_ready else 400
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'message': 'GPT-4o 연결 테스트 실패'
-        }), 500
 
 if __name__ == '__main__':
     run_server() 
