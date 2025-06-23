@@ -294,6 +294,7 @@ namespace VoiceMacroPro.Services
         /// <summary>
         /// 실시간 오디오 데이터 처리 및 서버 전송 함수
         /// NAudio에서 캡처된 오디오를 Base64로 인코딩하여 WebSocket으로 전송합니다.
+        /// Voice Activity Detection (VAD) 로직을 포함하여 실제 음성이 있을 때만 전송합니다.
         /// </summary>
         /// <param name="sender">이벤트 발생자</param>
         /// <param name="e">오디오 데이터 이벤트 인자</param>
@@ -307,11 +308,29 @@ namespace VoiceMacroPro.Services
                     double audioLevel = CalculateAudioLevel(e.Buffer, e.BytesRecorded);
                     AudioLevelChanged?.Invoke(this, audioLevel);
 
-                    // 오디오 데이터를 Base64로 인코딩
-                    string audioBase64 = Convert.ToBase64String(e.Buffer, 0, e.BytesRecorded);
+                    // Voice Activity Detection (VAD) - 실제 음성이 있는지 확인
+                    bool hasVoiceActivity = IsVoiceActivityDetected(e.Buffer, e.BytesRecorded, audioLevel);
+                    
+                    if (hasVoiceActivity)
+                    {
+                        // 오디오 데이터를 Base64로 인코딩
+                        string audioBase64 = Convert.ToBase64String(e.Buffer, 0, e.BytesRecorded);
 
-                    // WebSocket을 통해 실시간 오디오 스트리밍
-                    await _socket.EmitAsync("audio_chunk", new { audio = audioBase64 });
+                        // WebSocket을 통해 실시간 오디오 스트리밍 (음성 감지시만)
+                        await _socket.EmitAsync("audio_chunk", new { 
+                            audio = audioBase64,
+                            audio_level = audioLevel,
+                            has_voice = true 
+                        });
+                        
+                        // 음성 감지 로그 (디버그용 - 너무 많은 로그 방지)
+                        // _loggingService.LogDebug($"🎤 음성 감지됨 (레벨: {audioLevel:F3})");
+                    }
+                    else
+                    {
+                        // 음성이 감지되지 않으면 침묵 데이터 전송하지 않음
+                        // _loggingService.LogDebug($"🔇 침묵 감지됨 (레벨: {audioLevel:F3}) - 전송 건너뜀");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -343,6 +362,128 @@ namespace VoiceMacroPro.Services
 
             double average = sum / samples;
             return Math.Min(1.0, average / 32768.0); // 0.0 ~ 1.0으로 정규화
+        }
+
+        /// <summary>
+        /// Voice Activity Detection (VAD) - 실제 음성이 감지되었는지 확인하는 함수
+        /// 마이크 잡음이나 침묵 상태에서는 오디오 데이터를 전송하지 않기 위해 사용됩니다.
+        /// </summary>
+        /// <param name="buffer">오디오 버퍼</param>
+        /// <param name="bytesRecorded">녹음된 바이트 수</param>
+        /// <param name="audioLevel">이미 계산된 오디오 레벨</param>
+        /// <returns>음성 활동이 감지되면 true, 침묵이나 잡음이면 false</returns>
+        private bool IsVoiceActivityDetected(byte[] buffer, int bytesRecorded, double audioLevel)
+        {
+            // 1. 기본 볼륨 임계값 체크 (침묵 필터링)
+            const double MIN_VOLUME_THRESHOLD = 0.02; // 2% 이상의 볼륨 필요
+            if (audioLevel < MIN_VOLUME_THRESHOLD)
+            {
+                return false; // 너무 조용하면 침묵으로 판단
+            }
+
+            // 2. 최대 볼륨 임계값 체크 (과도한 잡음 필터링)
+            const double MAX_VOLUME_THRESHOLD = 0.95; // 95% 이상이면 클리핑으로 판단
+            if (audioLevel > MAX_VOLUME_THRESHOLD)
+            {
+                return false; // 너무 크면 클리핑/잡음으로 판단
+            }
+
+            // 3. 음성 신호의 동적 범위 확인 (음성은 변화가 있어야 함)
+            bool hasVariation = CheckSignalVariation(buffer, bytesRecorded);
+            if (!hasVariation)
+            {
+                return false; // 일정한 신호는 전자 잡음으로 판단
+            }
+
+            // 4. 제로 크로싱 비율 확인 (음성은 적절한 주파수 변화를 가짐)
+            double zeroCrossingRate = CalculateZeroCrossingRate(buffer, bytesRecorded);
+            const double MIN_ZCR = 0.01; // 최소 제로 크로싱 비율
+            const double MAX_ZCR = 0.30; // 최대 제로 크로싱 비율
+            if (zeroCrossingRate < MIN_ZCR || zeroCrossingRate > MAX_ZCR)
+            {
+                return false; // 제로 크로싱이 너무 적거나 많으면 잡음
+            }
+
+            // 모든 조건을 만족하면 음성으로 판단
+            return true;
+        }
+
+        /// <summary>
+        /// 신호의 변화량을 확인하여 일정한 잡음을 필터링하는 함수
+        /// </summary>
+        /// <param name="buffer">오디오 버퍼</param>
+        /// <param name="bytesRecorded">녹음된 바이트 수</param>
+        /// <returns>신호에 충분한 변화가 있으면 true</returns>
+        private bool CheckSignalVariation(byte[] buffer, int bytesRecorded)
+        {
+            if (bytesRecorded < 4) return false;
+
+            double variance = 0;
+            double mean = 0;
+            int samples = bytesRecorded / 2;
+
+            // 평균 계산
+            for (int i = 0; i < bytesRecorded; i += 2)
+            {
+                if (i + 1 < bytesRecorded)
+                {
+                    short sample = (short)((buffer[i + 1] << 8) | buffer[i]);
+                    mean += sample;
+                }
+            }
+            mean /= samples;
+
+            // 분산 계산
+            for (int i = 0; i < bytesRecorded; i += 2)
+            {
+                if (i + 1 < bytesRecorded)
+                {
+                    short sample = (short)((buffer[i + 1] << 8) | buffer[i]);
+                    variance += Math.Pow(sample - mean, 2);
+                }
+            }
+            variance /= samples;
+
+            // 표준편차가 일정 값 이상이어야 음성으로 판단
+            double standardDeviation = Math.Sqrt(variance);
+            const double MIN_VARIATION = 100.0; // 최소 변화량 임계값
+            
+            return standardDeviation > MIN_VARIATION;
+        }
+
+        /// <summary>
+        /// 제로 크로싱 비율을 계산하는 함수 (음성/잡음 구분에 도움)
+        /// </summary>
+        /// <param name="buffer">오디오 버퍼</param>
+        /// <param name="bytesRecorded">녹음된 바이트 수</param>
+        /// <returns>제로 크로싱 비율 (0.0 ~ 1.0)</returns>
+        private double CalculateZeroCrossingRate(byte[] buffer, int bytesRecorded)
+        {
+            if (bytesRecorded < 4) return 0.0;
+
+            int zeroCrossings = 0;
+            short previousSample = 0;
+            int samples = bytesRecorded / 2;
+
+            for (int i = 0; i < bytesRecorded; i += 2)
+            {
+                if (i + 1 < bytesRecorded)
+                {
+                    short currentSample = (short)((buffer[i + 1] << 8) | buffer[i]);
+                    
+                    // 부호가 바뀌었는지 확인 (제로 크로싱)
+                    if (i > 0 && ((previousSample >= 0 && currentSample < 0) || 
+                                  (previousSample < 0 && currentSample >= 0)))
+                    {
+                        zeroCrossings++;
+                    }
+                    
+                    previousSample = currentSample;
+                }
+            }
+
+            // 전체 샘플 수에 대한 제로 크로싱 비율
+            return samples > 1 ? (double)zeroCrossings / (samples - 1) : 0.0;
         }
 
         /// <summary>

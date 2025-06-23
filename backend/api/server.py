@@ -215,13 +215,14 @@ def handle_stop_voice_recognition():
 @socketio.on('audio_chunk')
 def handle_audio_chunk(data):
     """
-    실시간 오디오 청크 처리
-    클라이언트로부터 받은 오디오 데이터를 처리하고 음성인식 서비스로 전달합니다.
+    실시간 오디오 청크 처리 - Voice Activity Detection 검증 포함
+    클라이언트로부터 받은 오디오 데이터를 검증하고 음성인식 서비스로 전달합니다.
     
     Args:
-        data (dict): 오디오 데이터 (Base64 인코딩)
+        data (dict): 오디오 데이터 및 VAD 정보
             - audio: Base64 인코딩된 오디오 데이터
-            - format: 오디오 포맷 정보 (선택사항)
+            - audio_level: 클라이언트에서 계산한 오디오 레벨 (0.0~1.0)
+            - has_voice: 클라이언트 VAD 결과 (True/False)
     """
     client_id = request.sid
     
@@ -229,15 +230,14 @@ def handle_audio_chunk(data):
         if client_id not in connected_clients or not connected_clients[client_id]['is_recording']:
             return
         
-        # 오디오 데이터 추출
+        # 오디오 데이터 및 VAD 정보 추출
         audio_base64 = data.get('audio')
+        audio_level = data.get('audio_level', 0.0)
+        has_voice = data.get('has_voice', False)
+        
         if not audio_base64:
             emit('audio_processing_error', {'error': '오디오 데이터가 없습니다'})
             return
-        
-        # 세션 통계 업데이트
-        if client_id in voice_sessions:
-            voice_sessions[client_id]['audio_chunks_received'] += 1
         
         # Base64 오디오 데이터 디코딩
         try:
@@ -246,14 +246,40 @@ def handle_audio_chunk(data):
             
             print(f"🎵 오디오 청크 수신: {client_id} ({audio_length} bytes)")
             
-            # 오디오 데이터를 음성인식 서비스로 전달 (향후 GPT-4o 통합)
-            # 현재는 Whisper 서비스를 사용하여 임시 처리
+            # Voice Activity Detection 검증
+            vad_result = validate_audio_chunk_backend(audio_bytes, audio_level, has_voice)
+            
+            if not vad_result['is_valid']:
+                print(f"🔇 VAD 검증 실패: {vad_result['reason']} (레벨: {audio_level:.3f})")
+                
+                # VAD 실패 응답 (오류가 아닌 정상 응답으로 처리)
+                emit('audio_chunk_received', {
+                    'success': False,
+                    'reason': vad_result['reason'],
+                    'audio_length': audio_length,
+                    'audio_level': audio_level,
+                    'validation_details': vad_result,
+                    'timestamp': datetime.now().isoformat()
+                })
+                return
+            
+            # VAD 검증 통과 - 세션 통계 업데이트
+            if client_id in voice_sessions:
+                voice_sessions[client_id]['audio_chunks_received'] += 1
+            
+            print(f"🤖 GPT-4o 트랜스크립션 시도: {audio_length} bytes")
+            
+            # 음성 데이터를 트랜스크립션 서비스로 전달
             process_audio_for_transcription(client_id, audio_bytes)
+            
+            print("✅ GPT-4o 오디오 전송 완료")
             
             # 클라이언트에 수신 확인 전송
             emit('audio_chunk_received', {
                 'success': True,
                 'audio_length': audio_length,
+                'audio_level': audio_level,
+                'validation_details': vad_result,
                 'timestamp': datetime.now().isoformat()
             })
             
@@ -271,6 +297,121 @@ def handle_audio_chunk(data):
             'timestamp': datetime.now().isoformat()
         })
 
+def validate_audio_chunk_backend(audio_bytes: bytes, reported_level: float, client_vad_result: bool) -> dict:
+    """
+    백엔드에서 오디오 청크 추가 검증 (Python 버전)
+    
+    Args:
+        audio_bytes: 오디오 데이터 (PCM 16-bit)
+        reported_level: 클라이언트에서 보고한 오디오 레벨
+        client_vad_result: 클라이언트 VAD 결과
+        
+    Returns:
+        dict: 검증 결과
+    """
+    try:
+        # 1. 클라이언트 VAD 결과 확인
+        if not client_vad_result:
+            return {
+                'is_valid': False,
+                'reason': 'client_vad_failed',
+                'details': f'클라이언트에서 음성 활동 감지 안됨 (레벨: {reported_level:.3f})'
+            }
+        
+        # 2. 최소 바이트 수 확인
+        MIN_AUDIO_LENGTH = 960  # 24kHz * 0.04초 * 2bytes = 1920bytes 최소
+        if len(audio_bytes) < MIN_AUDIO_LENGTH:
+            return {
+                'is_valid': False,
+                'reason': 'insufficient_data',
+                'details': f'오디오 데이터가 너무 짧음: {len(audio_bytes)} bytes'
+            }
+        
+        # 3. 실제 오디오 레벨 재계산 (16-bit PCM Little-endian)
+        import struct
+        samples = []
+        
+        try:
+            for i in range(0, len(audio_bytes) - 1, 2):
+                sample = struct.unpack('<h', audio_bytes[i:i+2])[0]  # Little-endian 16-bit
+                samples.append(abs(sample))
+        except:
+            return {
+                'is_valid': False,
+                'reason': 'sample_parsing_error',
+                'details': '오디오 샘플 파싱 실패'
+            }
+        
+        if not samples:
+            return {
+                'is_valid': False,
+                'reason': 'no_valid_samples',
+                'details': '유효한 오디오 샘플이 없음'
+            }
+        
+        # 4. RMS 레벨 계산
+        avg_amplitude = sum(samples) / len(samples)
+        calculated_level = min(1.0, avg_amplitude / 32768.0)  # 0.0 ~ 1.0 정규화
+        
+        # 5. 레벨 차이 확인 (클라이언트 보고값과 비교)
+        level_difference = abs(calculated_level - reported_level)
+        MAX_LEVEL_DIFFERENCE = 0.15  # 15% 차이 허용 (조금 더 관대하게)
+        
+        if level_difference > MAX_LEVEL_DIFFERENCE:
+            return {
+                'is_valid': False,
+                'reason': 'level_mismatch',
+                'details': f'레벨 불일치: 계산값={calculated_level:.3f}, 보고값={reported_level:.3f}, 차이={level_difference:.3f}'
+            }
+        
+        # 6. 최소 임계값 확인
+        MIN_VALID_LEVEL = 0.008  # 0.8% 이상 (조금 더 관대하게)
+        if calculated_level < MIN_VALID_LEVEL:
+            return {
+                'is_valid': False,
+                'reason': 'too_quiet',
+                'details': f'오디오 레벨이 너무 낮음: {calculated_level:.3f}'
+            }
+        
+        # 7. 최대 임계값 확인 (클리핑 방지)
+        MAX_VALID_LEVEL = 0.98  # 98% 이하
+        if calculated_level > MAX_VALID_LEVEL:
+            return {
+                'is_valid': False,
+                'reason': 'clipping_detected',
+                'details': f'오디오 클리핑 감지: {calculated_level:.3f}'
+            }
+        
+        # 8. 신호 변화량 확인 (음성은 변화가 있어야 함)
+        if len(samples) > 10:  # 충분한 샘플이 있을 때만
+            variance = sum((sample - avg_amplitude) ** 2 for sample in samples[:100]) / min(len(samples), 100)
+            std_dev = variance ** 0.5
+            
+            MIN_VARIATION = 50.0  # 최소 변화량 (조금 더 관대하게)
+            if std_dev < MIN_VARIATION:
+                return {
+                    'is_valid': False,
+                    'reason': 'insufficient_variation',
+                    'details': f'신호 변화 부족 (표준편차: {std_dev:.1f})'
+                }
+        
+        # 모든 검증 통과
+        return {
+            'is_valid': True,
+            'reason': 'valid',
+            'details': f'유효한 음성 데이터 (레벨: {calculated_level:.3f}, 샘플: {len(samples)})',
+            'calculated_level': calculated_level,
+            'reported_level': reported_level,
+            'sample_count': len(samples)
+        }
+        
+    except Exception as e:
+        return {
+            'is_valid': False,
+            'reason': 'validation_error',
+            'details': f'검증 중 오류: {str(e)}'
+        }
+
 def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
     """
     오디오 데이터를 GPT-4o 또는 Whisper로 음성인식 처리하는 함수
@@ -279,6 +420,33 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
         client_id (str): 클라이언트 세션 ID
         audio_bytes (bytes): 디코딩된 PCM 오디오 데이터
     """
+    def handle_transcription_result(text: str, confidence: float, source: str):
+        """트랜스크립션 결과 처리 공통 함수"""
+        try:
+            if text and len(text.strip()) > 0:
+                # 세션 통계 업데이트
+                if client_id in voice_sessions:
+                    voice_sessions[client_id]['transcription_count'] += 1
+                
+                print(f"📝 {source} 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
+                
+                # 클라이언트에 트랜스크립션 결과 전송
+                socketio.emit('transcription_result', {
+                    'type': 'final',
+                    'text': text,
+                    'confidence': confidence,
+                    'session_id': client_id,
+                    'source': source,
+                    'timestamp': datetime.now().isoformat()
+                }, room=client_id)
+                
+                # 매크로 매칭 시도
+                try_macro_matching(client_id, text, confidence)
+            else:
+                print(f"🔇 {source} 음성인식 결과가 비어있음")
+        except Exception as e:
+            print(f"❌ 트랜스크립션 결과 처리 오류: {e}")
+    
     def run_transcription():
         global gpt4o_service, gpt4o_connection_status
         
@@ -288,51 +456,39 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                 print(f"⚠️ 오디오 데이터가 너무 작음: {len(audio_bytes)} bytes")
                 return
             
-            # GPT-4o 서비스 우선 시도
-            if gpt4o_service and Config.GPT4O_ENABLED:
+            # GPT-4o 서비스 우선 시도 (현재는 비활성화, Whisper로 직접 처리)
+            gpt4o_available = False  # 실제 GPT-4o 연결이 없으므로 비활성화
+            
+            if gpt4o_service and Config.GPT4O_ENABLED and gpt4o_available:
                 try:
                     print(f"🤖 GPT-4o 트랜스크립션 시도: {len(audio_bytes)} bytes")
                     
-                    # GPT-4o 서비스로 직접 오디오 전송
+                    # GPT-4o 콜백 함수 설정
                     def handle_gpt4o_transcription(transcription_data):
-                        if transcription_data["type"] == "final":
-                            text = transcription_data["text"].strip()
-                            confidence = transcription_data["confidence"]
+                        if transcription_data.get("type") == "final":
+                            text = transcription_data.get("text", "").strip()
+                            confidence = transcription_data.get("confidence", 0.9)
                             
-                            if text and len(text) > 0:
-                                # 세션 통계 업데이트
-                                if client_id in voice_sessions:
-                                    voice_sessions[client_id]['transcription_count'] += 1
-                                
-                                print(f"📝 GPT-4o 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
-                                
-                                # 연결 상태 업데이트
-                                gpt4o_connection_status.update({
-                                    'connected': True,
-                                    'last_attempt': datetime.now().isoformat(),
-                                    'error_message': None
-                                })
-                                
-                                # 클라이언트에 트랜스크립션 결과 전송
-                                socketio.emit('transcription_result', {
-                                    'type': 'final',
-                                    'text': text,
-                                    'confidence': confidence,
-                                    'session_id': client_id,
-                                    'source': 'gpt4o',
-                                    'timestamp': datetime.now().isoformat()
-                                }, room=client_id)
-                                
-                                # 매크로 매칭 시도
-                                try_macro_matching(client_id, text, confidence)
+                            # 공통 트랜스크립션 결과 처리 함수 호출
+                            handle_transcription_result(text, confidence, 'GPT-4o')
                     
-                    # GPT-4o 서비스에 콜백 설정 후 오디오 전송
-                    gpt4o_service.set_transcription_callback(handle_gpt4o_transcription)
-                    
-                    # 비동기적으로 오디오 전송 (실제 구현에서는 이미 연결된 상태에서 전송)
-                    # 여기서는 테스트를 위해 직접 결과 생성
-                    print("✅ GPT-4o 오디오 전송 완료")
-                    return
+                    # GPT-4o 실제 연결 확인
+                    if hasattr(gpt4o_service, 'is_connected') and gpt4o_service.is_connected:
+                        # 콜백 설정
+                        gpt4o_service.set_transcription_callback(handle_gpt4o_transcription)
+                        
+                        # 실제 GPT-4o 오디오 전송 (비동기)
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(gpt4o_service.send_audio_chunk(audio_bytes))
+                        loop.close()
+                        
+                        print("✅ GPT-4o 오디오 전송 완료")
+                        # GPT-4o 결과를 기다리지 않고 계속 진행 (비동기 처리)
+                        return  # GPT-4o 성공 시 Whisper 건너뛰기
+                    else:
+                        raise Exception("GPT-4o 서비스가 연결되지 않음")
                     
                 except Exception as gpt4o_error:
                     print(f"⚠️ GPT-4o 처리 실패, Whisper로 폴백: {gpt4o_error}")
@@ -341,15 +497,30 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                         'last_attempt': datetime.now().isoformat(),
                         'error_message': str(gpt4o_error)
                     })
+            else:
+                print(f"🔄 GPT-4o 사용 불가, Whisper로 직접 처리")
+                print(f"   - GPT4O_ENABLED: {Config.GPT4O_ENABLED}")
+                print(f"   - gpt4o_service: {gpt4o_service is not None}")
+                print(f"   - gpt4o_available: {gpt4o_available}")
             
             # Whisper 폴백 처리
-            print(f"🎙️ Whisper 트랜스크립션 폴백 시작...")
+            print(f"🎙️ Whisper 트랜스크립션 폴백 시작... (오디오 크기: {len(audio_bytes)} bytes)")
+            
+            # Whisper 서비스 상태 확인
+            if not whisper_service:
+                print("❌ Whisper 서비스가 초기화되지 않음")
+                socketio.emit('transcription_error', {
+                    'error': 'Whisper 서비스가 초기화되지 않음',
+                    'timestamp': datetime.now().isoformat()
+                }, room=client_id)
+                return
             
             # 임시 오디오 파일 저장 (Whisper 처리용)
             temp_audio_path = f"temp_audio/audio_{client_id}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.wav"
             
             # temp_audio 디렉토리가 없으면 생성
             os.makedirs("temp_audio", exist_ok=True)
+            print(f"📁 임시 디렉토리 준비: temp_audio/")
             
             # PCM 데이터를 WAV 파일로 변환하여 저장
             import wave
@@ -360,6 +531,12 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                 channels = 1
                 sample_width = 2  # 16-bit = 2 bytes
                 
+                print(f"🔧 WAV 파일 생성 중: {temp_audio_path}")
+                print(f"   - 샘플 레이트: {sample_rate}Hz")
+                print(f"   - 채널: {channels} (모노)")
+                print(f"   - 비트 깊이: {sample_width * 8}bit")
+                print(f"   - 오디오 데이터 크기: {len(audio_bytes)} bytes")
+                
                 # WAV 파일 헤더와 함께 저장
                 with wave.open(temp_audio_path, 'wb') as wav_file:
                     wav_file.setnchannels(channels)
@@ -367,38 +544,28 @@ def process_audio_for_transcription(client_id: str, audio_bytes: bytes):
                     wav_file.setframerate(sample_rate)
                     wav_file.writeframes(audio_bytes)
                 
-                print(f"🎵 Whisper용 오디오 파일 저장: {temp_audio_path} ({len(audio_bytes)} bytes)")
+                # 생성된 파일 크기 확인
+                file_size = os.path.getsize(temp_audio_path)
+                print(f"✅ WAV 파일 생성 완료: {temp_audio_path} ({file_size} bytes)")
                 
                 # Whisper를 사용한 음성인식
+                print(f"🤖 Whisper 트랜스크립션 시작...")
                 transcription_result = whisper_service.transcribe_audio(temp_audio_path)
+                print(f"📋 Whisper 트랜스크립션 결과: {transcription_result}")
                 
                 if transcription_result and transcription_result.get('success'):
                     text = transcription_result.get('text', '').strip()
                     confidence = transcription_result.get('confidence', 0.0)
                     
-                    if text and len(text) > 0:
-                        # 세션 통계 업데이트
-                        if client_id in voice_sessions:
-                            voice_sessions[client_id]['transcription_count'] += 1
-                        
-                        print(f"📝 Whisper 음성인식 결과: '{text}' (신뢰도: {confidence:.2f})")
-                        
-                        # 클라이언트에 트랜스크립션 결과 전송
-                        socketio.emit('transcription_result', {
-                            'type': 'final',
-                            'text': text,
-                            'confidence': confidence,
-                            'session_id': client_id,
-                            'source': 'whisper',
-                            'timestamp': datetime.now().isoformat()
-                        }, room=client_id)
-                        
-                        # 매크로 매칭 시도
-                        try_macro_matching(client_id, text, confidence)
-                    else:
-                        print("🔇 음성인식 결과가 비어있음")
+                    # 공통 트랜스크립션 결과 처리 함수 호출
+                    handle_transcription_result(text, confidence, 'Whisper')
                 else:
                     print(f"❌ Whisper 음성인식 실패: {transcription_result}")
+                    # 실패 시에도 클라이언트에 알림
+                    socketio.emit('transcription_error', {
+                        'error': f'Whisper 트랜스크립션 실패: {transcription_result}',
+                        'timestamp': datetime.now().isoformat()
+                    }, room=client_id)
                 
             except Exception as audio_processing_error:
                 print(f"❌ 오디오 파일 처리 오류: {audio_processing_error}")

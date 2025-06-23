@@ -255,17 +255,170 @@ class WebSocketVoiceServer:
             await self.send_error(websocket, f"녹음 중지 오류: {str(e)}")
     
     async def _handle_audio_chunk(self, websocket, client_id: str, data: Dict):
-        """오디오 청크 처리 (현재는 GPT-4o가 자동으로 처리)"""
+        """
+        오디오 청크 처리 - Voice Activity Detection 추가 검증
+        클라이언트에서 이미 VAD를 통과한 오디오만 받지만, 백엔드에서 추가 검증을 실시합니다.
+        """
         try:
-            # GPT-4o는 실시간 오디오 스트림을 자동으로 처리하므로
-            # 클라이언트에서 별도로 오디오 청크를 보낼 필요 없음
+            # 오디오 데이터 추출
+            audio_base64 = data.get('audio', '')
+            audio_level = data.get('audio_level', 0.0)
+            has_voice = data.get('has_voice', False)
+            
+            if not audio_base64:
+                await self.send_error(websocket, "오디오 데이터가 비어있습니다.")
+                return
+            
+            # Base64 디코딩 시도
+            try:
+                audio_bytes = base64.b64decode(audio_base64)
+                audio_length = len(audio_bytes)
+            except Exception as decode_error:
+                self.logger.error(f"오디오 데이터 디코딩 실패: {decode_error}")
+                await self.send_error(websocket, "오디오 데이터 디코딩 실패")
+                return
+            
+            # 최소 오디오 길이 확인 (너무 짧은 데이터 필터링)
+            MIN_AUDIO_LENGTH = 960  # 24kHz * 0.04초 (40ms) * 2bytes = 1920bytes 최소
+            if audio_length < MIN_AUDIO_LENGTH:
+                self.logger.debug(f"오디오 청크가 너무 짧음: {audio_length} bytes (최소: {MIN_AUDIO_LENGTH})")
+                await self.send_message(websocket, {
+                    'type': 'audio_chunk_received',
+                    'success': False,
+                    'reason': 'too_short',
+                    'audio_length': audio_length
+                })
+                return
+            
+            # 클라이언트 VAD 결과 확인
+            if not has_voice:
+                self.logger.debug(f"클라이언트 VAD: 음성 없음 (레벨: {audio_level:.3f})")
+                await self.send_message(websocket, {
+                    'type': 'audio_chunk_received',
+                    'success': False,
+                    'reason': 'no_voice_detected',
+                    'audio_level': audio_level,
+                    'audio_length': audio_length
+                })
+                return
+            
+            # 백엔드 추가 검증
+            backend_vad_result = self._validate_audio_chunk(audio_bytes, audio_level)
+            
+            if not backend_vad_result['is_valid']:
+                self.logger.debug(f"백엔드 VAD 실패: {backend_vad_result['reason']}")
+                await self.send_message(websocket, {
+                    'type': 'audio_chunk_received',
+                    'success': False,
+                    'reason': f"backend_vad_{backend_vad_result['reason']}",
+                    'audio_level': audio_level,
+                    'audio_length': audio_length
+                })
+                return
+            
+            # 모든 검증 통과 - GPT-4o로 전송 (실제 트랜스크립션 로직은 별도 서비스에서 처리)
+            if self.voice_service and hasattr(self.voice_service, 'process_audio_chunk'):
+                try:
+                    # 음성 서비스로 오디오 전달
+                    await self.voice_service.process_audio_chunk(audio_bytes)
+                    self.logger.debug(f"🎤 유효한 음성 감지: {audio_length} bytes (레벨: {audio_level:.3f})")
+                except Exception as process_error:
+                    self.logger.error(f"음성 처리 오류: {process_error}")
+                    await self.send_error(websocket, f"음성 처리 오류: {str(process_error)}")
+                    return
+            
+            # 성공 응답
             await self.send_message(websocket, {
                 'type': 'audio_chunk_received',
-                'message': 'GPT-4o가 실시간으로 오디오를 처리 중입니다.'
+                'success': True,
+                'audio_length': audio_length,
+                'audio_level': audio_level,
+                'backend_validation': backend_vad_result,
+                'timestamp': datetime.now().isoformat()
             })
             
         except Exception as e:
+            self.logger.error(f"오디오 청크 처리 오류: {e}")
             await self.send_error(websocket, f"오디오 처리 오류: {str(e)}")
+    
+    def _validate_audio_chunk(self, audio_bytes: bytes, reported_level: float) -> Dict:
+        """
+        백엔드에서 오디오 청크 추가 검증
+        
+        Args:
+            audio_bytes: 오디오 데이터 (PCM 16-bit)
+            reported_level: 클라이언트에서 보고한 오디오 레벨
+            
+        Returns:
+            Dict: 검증 결과 {'is_valid': bool, 'reason': str, 'calculated_level': float}
+        """
+        try:
+            # 최소 바이트 수 확인
+            if len(audio_bytes) < 4:
+                return {'is_valid': False, 'reason': 'insufficient_data', 'calculated_level': 0.0}
+            
+            # 실제 오디오 레벨 재계산 (16-bit PCM)
+            import struct
+            samples = []
+            for i in range(0, len(audio_bytes) - 1, 2):
+                try:
+                    sample = struct.unpack('<h', audio_bytes[i:i+2])[0]  # Little-endian 16-bit
+                    samples.append(abs(sample))
+                except:
+                    continue
+            
+            if not samples:
+                return {'is_valid': False, 'reason': 'no_valid_samples', 'calculated_level': 0.0}
+            
+            # RMS 계산
+            avg_amplitude = sum(samples) / len(samples)
+            calculated_level = min(1.0, avg_amplitude / 32768.0)  # 0.0 ~ 1.0 정규화
+            
+            # 레벨 차이 확인 (클라이언트 보고값과 비교)
+            level_difference = abs(calculated_level - reported_level)
+            MAX_LEVEL_DIFFERENCE = 0.1  # 10% 차이 허용
+            
+            if level_difference > MAX_LEVEL_DIFFERENCE:
+                return {
+                    'is_valid': False, 
+                    'reason': 'level_mismatch', 
+                    'calculated_level': calculated_level,
+                    'reported_level': reported_level,
+                    'difference': level_difference
+                }
+            
+            # 최소 임계값 확인
+            MIN_VALID_LEVEL = 0.01  # 1% 이상
+            if calculated_level < MIN_VALID_LEVEL:
+                return {
+                    'is_valid': False, 
+                    'reason': 'too_quiet', 
+                    'calculated_level': calculated_level
+                }
+            
+            # 최대 임계값 확인 (클리핑 방지)
+            MAX_VALID_LEVEL = 0.98  # 98% 이하
+            if calculated_level > MAX_VALID_LEVEL:
+                return {
+                    'is_valid': False, 
+                    'reason': 'clipping_detected', 
+                    'calculated_level': calculated_level
+                }
+            
+            # 모든 검증 통과
+            return {
+                'is_valid': True, 
+                'reason': 'valid', 
+                'calculated_level': calculated_level,
+                'sample_count': len(samples)
+            }
+            
+        except Exception as e:
+            return {
+                'is_valid': False, 
+                'reason': f'validation_error_{str(e)}', 
+                'calculated_level': 0.0
+            }
     
     async def _handle_get_macros(self, websocket, client_id: str, data: Dict):
         """매크로 목록 조회 처리"""
