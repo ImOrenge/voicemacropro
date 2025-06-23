@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -524,18 +525,146 @@ namespace VoiceMacroPro.Views
         {
             try
             {
-                _loggingService.LogInfo("GPT-4o 서비스 재연결 시도");
+                _loggingService.LogInfo("🔄 GPT-4o 서비스 재연결 시도");
+                
+                // 1단계: 백엔드 WebSocket 서버 연결 확인
+                UIHelper.ShowInfo("WebSocket 서버에 연결하는 중...");
                 
                 // 기존 연결 정리
                 _voiceService.Dispose();
                 
-                // 새 서비스 인스턴스로 재초기화
+                // 2단계: 새 서비스 인스턴스로 재초기화
                 await InitializeGpt4oVoiceSystemAsync();
+                
+                if (!_voiceService.IsConnected)
+                {
+                    UIHelper.ShowError("WebSocket 서버 연결에 실패했습니다.\n백엔드 서버가 실행 중인지 확인하세요.");
+                    return;
+                }
+                
+                // 3단계: GPT-4o 트랜스크립션 서비스 상태 확인
+                UIHelper.ShowInfo("GPT-4o 서비스 연결 상태를 확인하는 중...");
+                
+                bool gpt4oReady = await CheckGpt4oServiceStatus();
+                
+                if (gpt4oReady)
+                {
+                    UIHelper.ShowInfo("✅ GPT-4o 실시간 음성인식 서비스가 성공적으로 연결되었습니다!\n이제 마이크 테스트를 진행할 수 있습니다.");
+                    _loggingService.LogInfo("✅ GPT-4o 서비스 재연결 성공");
+                }
+                else
+                {
+                    // 4단계: GPT-4o 연결 시도
+                    UIHelper.ShowInfo("GPT-4o 서비스에 연결하는 중...");
+                    bool gpt4oConnected = await ConnectToGpt4oService();
+                    
+                    if (gpt4oConnected)
+                    {
+                        UIHelper.ShowInfo("✅ GPT-4o 서비스 연결 완료!\n실시간 음성인식이 준비되었습니다.");
+                        _loggingService.LogInfo("✅ GPT-4o 서비스 연결 성공");
+                    }
+                    else
+                    {
+                        UIHelper.ShowWarning("⚠️ GPT-4o 서비스 연결에 실패했습니다.\nWhisper 기반 음성인식을 사용합니다.\n\n가능한 원인:\n- OpenAI API 키 미설정\n- 네트워크 연결 문제\n- GPT-4o 베타 권한 부족");
+                        _loggingService.LogWarning("⚠️ GPT-4o 서비스 연결 실패, Whisper 폴백 사용");
+                    }
+                }
             }
             catch (Exception ex)
             {
-                _loggingService.LogError($"재연결 오류: {ex.Message}");
-                UIHelper.ShowError($"재연결 중 오류가 발생했습니다: {ex.Message}");
+                _loggingService.LogError($"❌ 재연결 오류: {ex.Message}");
+                UIHelper.ShowError($"재연결 중 오류가 발생했습니다:\n{ex.Message}\n\n네트워크 연결과 백엔드 서버 상태를 확인하세요.");
+            }
+        }
+
+        /// <summary>
+        /// GPT-4o 트랜스크립션 서비스 상태를 확인하는 함수
+        /// </summary>
+        /// <returns>GPT-4o 서비스가 준비되었는지 여부</returns>
+        private async Task<bool> CheckGpt4oServiceStatus()
+        {
+            try
+            {
+                // HttpClient를 통해 직접 GPT-4o 서비스 상태 확인
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(10);
+                
+                var response = await httpClient.GetAsync("http://localhost:5000/api/gpt4o/status");
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    var jsonDocument = System.Text.Json.JsonDocument.Parse(content);
+                    var root = jsonDocument.RootElement;
+                    
+                    if (root.TryGetProperty("success", out var successElement) && successElement.GetBoolean())
+                    {
+                        var data = root.GetProperty("data");
+                        bool serviceAvailable = data.GetProperty("service_available").GetBoolean();
+                        bool enabled = data.GetProperty("enabled").GetBoolean();
+                        bool apiKeyConfigured = data.GetProperty("api_key_configured").GetBoolean();
+                        bool realTimeConnected = data.GetProperty("real_time_connected").GetBoolean();
+                        
+                        _loggingService.LogInfo($"📊 GPT-4o 상태 - 서비스: {serviceAvailable}, 활성화: {enabled}, API키: {apiKeyConfigured}, 연결: {realTimeConnected}");
+                        
+                        return serviceAvailable && enabled && apiKeyConfigured && realTimeConnected;
+                    }
+                }
+                
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ GPT-4o 상태 확인 실패: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// GPT-4o 트랜스크립션 서비스에 연결을 시도하는 함수
+        /// </summary>
+        /// <returns>연결 성공 여부</returns>
+        private async Task<bool> ConnectToGpt4oService()
+        {
+            try
+            {
+                // HttpClient를 통해 직접 GPT-4o 서비스 연결 시도
+                using var httpClient = new HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(10);
+                
+                var content = new StringContent("", System.Text.Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync("http://localhost:5000/api/gpt4o/connect", content);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    _loggingService.LogInfo("🤖 GPT-4o 서비스 연결 요청 전송됨");
+                    
+                    // 연결 완료까지 대기 (최대 10초)
+                    for (int i = 0; i < 10; i++)
+                    {
+                        await Task.Delay(1000); // 1초 대기
+                        
+                        bool isConnected = await CheckGpt4oServiceStatus();
+                        if (isConnected)
+                        {
+                            return true;
+                        }
+                    }
+                    
+                    _loggingService.LogWarning("⏱️ GPT-4o 연결 타임아웃");
+                    return false;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _loggingService.LogError($"❌ GPT-4o 연결 요청 실패: {response.StatusCode} - {errorContent}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                _loggingService.LogError($"❌ GPT-4o 연결 시도 실패: {ex.Message}");
+                return false;
             }
         }
 
@@ -627,9 +756,19 @@ namespace VoiceMacroPro.Views
             {
                 _loggingService.LogInfo("🎤 마이크 테스트 시작");
 
-                if (!IsRecording)
+                // 연결 상태 확인 (잘못된 IsRecording 대신 ConnectionStatus 사용)
+                if (ConnectionStatus != ConnectionStatus.Connected)
                 {
-                    UIHelper.ShowWarning("먼저 GPT-4o 서비스에 연결해주세요.");
+                    UIHelper.ShowWarning("GPT-4o 서비스에 연결되어 있지 않습니다.\n먼저 '연결 재시도' 버튼을 클릭하여 서비스에 연결해주세요.");
+                    _loggingService.LogWarning("⚠️ GPT-4o 서비스 미연결 상태에서 마이크 테스트 시도");
+                    return;
+                }
+
+                // WebSocket 연결 확인
+                if (!_voiceService.IsConnected)
+                {
+                    UIHelper.ShowWarning("WebSocket 서버에 연결되어 있지 않습니다.\n서비스를 다시 초기화하겠습니다.");
+                    await InitializeGpt4oVoiceSystemAsync();
                     return;
                 }
 
@@ -640,6 +779,7 @@ namespace VoiceMacroPro.Views
                 if (testStarted)
                 {
                     IsRecording = true;
+                    _loggingService.LogInfo("✅ 마이크 테스트 녹음 시작");
                     
                     // 3초 후 자동 중지
                     await Task.Delay(3000);
@@ -654,7 +794,7 @@ namespace VoiceMacroPro.Views
                 }
                 else
                 {
-                    UIHelper.ShowError("마이크 테스트를 시작할 수 없습니다.");
+                    UIHelper.ShowError("마이크 테스트를 시작할 수 없습니다.\n마이크가 올바르게 연결되어 있는지 확인하세요.");
                 }
             }
             catch (Exception ex)
