@@ -1,0 +1,68 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Security Guidelines
+
+## Data Protection
+
+### User Data
+- Encrypt all personal information
+- Use secure storage for API keys
+- Implement data retention policies
+- Regular security audits
+
+### Audio Data
+- Encrypt voice recordings
+- Implement secure streaming
+- Auto-delete after processing
+- Access control implementation
+
+### Macro Storage
+- Encrypt macro definitions
+- Secure preset storage
+- Access logging
+- Version control for changes
+
+## API Security
+
+### Authentication
+- Implement OAuth 2.0
+- Use secure token storage
+- Regular token rotation
+- Rate limiting implementation
+
+### Communication
+- Use WSS for WebSocket
+- HTTPS for REST APIs
+- Certificate validation
+- Secure headers implementation
+
+## Application Security
+
+### Input Validation
+- Sanitize all user inputs
+- Validate file uploads
+- Check macro scripts
+- Prevent injection attacks
+
+### Process Isolation
+- Sandbox macro execution
+- Isolate voice processing
+- Secure IPC implementation
+- Resource access control
+
+## Monitoring
+
+### Audit Logging
+- Log security events
+- Monitor access patterns
+- Track system changes
+- Alert on suspicious activity
+
+### Incident Response
+- Define security protocols
+- Implement auto-blocking
+- Create recovery procedures
+- Regular security updates

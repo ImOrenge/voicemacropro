@@ -1,0 +1,82 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Code Standards and Development Rules
+
+## Python Backend
+
+### Code Style
+- Follow PEP 8 guidelines
+- Use type hints for all functions
+- Document all public functions and classes with docstrings
+- Maximum line length: 100 characters
+
+### File Organization
+- One class per file
+- Related utilities in separate modules
+- Test files should mirror source file structure
+
+### Naming Conventions
+- Classes: PascalCase
+- Functions/variables: snake_case
+- Constants: UPPER_SNAKE_CASE
+- Private members: _leading_underscore
+
+### Error Handling
+- Use custom exception classes in `src/exceptions/`
+- Always include error context
+- Log all errors with appropriate level
+
+## C# Frontend
+
+### Code Style
+- Follow Microsoft C# coding conventions
+- Use XML documentation comments
+- Maximum line length: 120 characters
+
+### XAML Guidelines
+- One control per line
+- Use proper indentation
+- Resource dictionaries for shared styles
+- Binding names should be descriptive
+
+### Naming Conventions
+- Classes/Properties: PascalCase
+- Private fields: _camelCase
+- Interface names: IBeginWithI
+- Event handlers: Object_Event
+
+### Architecture
+- Follow MVVM pattern strictly
+- Use dependency injection
+- Implement INotifyPropertyChanged
+- Async/await for all I/O operations
+
+## General Rules
+
+### Git Workflow
+- Feature branches from develop
+- Pull requests require review
+- Commit messages follow conventional commits
+- Squash commits before merge
+
+### Testing
+- Unit tests required for all features
+- Integration tests for critical paths
+- Performance tests for real-time features
+- Test coverage minimum: 80%
+
+### Documentation
+- Update docs with code changes
+- Include code examples
+- Document breaking changes
+- Keep README.md updated
+
+### Security
+- No hardcoded secrets
+- Use environment variables
+- Validate all inputs
+- Encrypt sensitive data
+

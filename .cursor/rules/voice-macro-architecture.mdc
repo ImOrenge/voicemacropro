@@ -1,0 +1,53 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Voice Macro System Architecture
+
+## Core Components
+
+### Backend (Python)
+- Main service components should be in `src/services/`
+- Audio processing modules in `src/audio/`
+- GPT-4o integration in `src/gpt4o/`
+- WebSocket server in `src/server/`
+- Database models in `src/models/`
+
+### Frontend (C# WPF)
+- UI components in `VoiceMacroPro/Views/`
+- View models in `VoiceMacroPro/ViewModels/`
+- Services in `VoiceMacroPro/Services/`
+- Models in `VoiceMacroPro/Models/`
+
+## Key Features
+
+### Voice Recognition
+- GPT-4o streaming implementation in `src/gpt4o/streaming.py`
+- Audio capture system in `src/audio/capture.py`
+- Real-time processing in `src/audio/realtime_processor.py`
+
+### Macro System
+- Macro definitions in `src/macros/definitions.py`
+- Macro execution engine in `src/macros/engine.py`
+- Macro templates in `src/macros/templates/`
+
+### Database
+- SQLite schema in `src/models/schema.sql`
+- Model definitions in `src/models/`
+- Migration scripts in `src/models/migrations/`
+
+## Configuration
+- Environment variables in `.env`
+- App settings in `config/settings.py`
+- Logging config in `config/logging.py`
+
+## Testing
+- Unit tests in `tests/unit/`
+- Integration tests in `tests/integration/`
+- Performance tests in `tests/performance/`
+
+## Documentation
+- API docs in `docs/api/`
+- User guide in `docs/user/`
+- Developer guide in `docs/dev/`

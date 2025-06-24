@@ -1,0 +1,69 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Performance Guidelines
+
+## Real-time Processing Requirements
+
+### Voice Recognition
+- Maximum latency: 300ms
+- Audio buffer size: 100ms
+- Sample rate: 24kHz
+- Bit depth: 16-bit
+- Channels: Mono
+
+### Macro Execution
+- Command response time: < 50ms
+- Input simulation accuracy: 99.9%
+- Maximum concurrent macros: 10
+- Memory usage per macro: < 1MB
+
+## Resource Usage Limits
+
+### CPU Usage
+- Main process: < 15%
+- Background services: < 5%
+- Audio processing: < 10%
+- Total system impact: < 30%
+
+### Memory Management
+- Total application: < 200MB
+- Audio buffer: < 50MB
+- Cache size: < 100MB
+- Garbage collection optimization required
+
+## Optimization Strategies
+
+### Audio Processing
+- Use circular buffers
+- Implement voice activity detection
+- Optimize FFT calculations
+- Cache frequently used audio segments
+
+### GPT-4o Integration
+- Streaming response handling
+- Batch processing when possible
+- Cache API responses
+- Implement retry with backoff
+
+### Database Operations
+- Use prepared statements
+- Index frequently queried fields
+- Implement query caching
+- Regular vacuum and optimization
+
+## Monitoring and Profiling
+
+### Performance Metrics
+- Track API response times
+- Monitor memory usage
+- Log CPU utilization
+- Measure command latency
+
+### Debugging Tools
+- Use memory profilers
+- CPU usage analysis
+- Network traffic monitoring
+- Performance regression testing
